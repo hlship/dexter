@@ -2,11 +2,11 @@
   (:require
     ["react" :as react]
     ["react-flow-renderer" :as rfr :default ReactFlow]
-    [reagent.core :as r]
-    [re-frame.core :as rf]
+    [re-frame.core :as rf :refer [reg-sub reg-event-db]]
     [clojure.spec.alpha :as s]
     [medley.core :as medley]
     [net.lewisship.dex.common :refer [<sub event-dispatch]]))
+
 
 (s/def ::input-model (s/keys :req-un [::nodes ::root-node-id]))
 (s/def ::nodes (s/coll-of ::node))
@@ -49,7 +49,7 @@
                         set)}))
 
 (def placeholder-input-model
-  '{:root-node-id io.aviso/config
+  '{:root-node-id org.clojure/core.async
     :nodes [{:id walmartlabs/active-status
              :version "0.1.15"
              :dependencies [{:on org.clojure/clojure}
@@ -122,15 +122,85 @@
                    (filter relevant-edge?))]
     [all-nodes edges]))
 
+(reg-event-db ::set-input-model
+              [rf/unwrap]
+              (fn [db input-model]
+                (assoc db ::input-model input-model
+                          ::focus-node-id (-> input-model :root-node-id str))))
+
+;; Just putting a key into the app db doesn't trigger anything; instead register a sub that extracts the
+;; data (with an engineered coincidence.
+(reg-sub ::input-model
+         :-> ::input-model)
+
+(reg-sub ::view-nodes
+         :<- [::input-model]
+         :-> (fn [input-model]
+               (let [nodes (map input-node->view-node (:nodes input-model))]
+                 (medley/index-by :id nodes))))
+
+(reg-sub ::focus-node-id
+         :-> ::focus-node-id)
+
+(reg-sub ::focus-node
+         :<- [::view-nodes]
+         :<- [::focus-node-id]
+         ;; Gets a single argument, no event
+         :-> (fn [[view-nodes focus-node-id]]
+               (get view-nodes focus-node-id)))
+
+(reg-sub ::dependents
+         :<- [::view-nodes]
+         :<- [::focus-node-id]
+         :-> (fn [[view-nodes focus-node-id]]
+               (->> view-nodes
+                    vals
+                    (filter #(contains? (:dependencies %) focus-node-id)))))
+
+(reg-sub ::dependencies
+         :<- [::view-nodes]
+         :<- [::focus-node]
+         :-> (fn [[view-nodes focus-node]]
+               (map view-nodes (:dependencies focus-node))))
+
+(reg-sub ::view-ready-nodes
+         :<- [::dependents]
+         :<- [::focus-node]
+         :<- [::dependencies]
+         (fn [[dependents focus-node dependencies]]
+           (let [dependents' (->> dependents
+                                  (sort-by :id)
+                                  (layout-row 50))
+                 dependencies' (->> dependencies
+                                    (sort-by :id)
+                                    (layout-row 300))
+                 focus-node' (layout-row 200 [focus-node])]
+             (-> dependents'
+                 (into dependencies')
+                 (into focus-node')))))
+
+(reg-sub ::edges
+         :<- [::view-ready-nodes]
+         :-> (fn [nodes]
+               ;; Only edges where both sides of the connection are "on screen" should be
+               ;; included.
+               (let [relevant-ids (->> nodes (map :id) set)
+                     relevant-edge? (fn [{:keys [source target]}]
+                                      (and (contains? relevant-ids source)
+                                           (contains? relevant-ids target)))]
+                 (->> nodes
+                      (mapcat :edges)
+                      (filter relevant-edge?)))))
+
 (defn flow
   []
-  (let [[nodes edges] (-> placeholder-input-model
-                          build-view-nodes
-                          (layout-nodes+edges (-> placeholder-input-model :root-node-id str)))]
-    [:div.app-flow-container
-     ;; :> converts the top level map to a JS map, but doesn't do so recursively.
-     [:> ReactFlow {:nodes (clj->js nodes)
-                    :edges (clj->js edges)}]]))
+  (let [nodes (<sub [::view-ready-nodes])
+        edges (<sub [::edges])]
+    (when nodes
+      [:div.app-flow-container
+       ;; :> converts the top level map to a JS map, but doesn't do so recursively.
+       [:> ReactFlow {:nodes (clj->js nodes)
+                      :edges (clj->js edges)}]])))
 
 (defn flow-panel
   []
@@ -141,5 +211,6 @@
 
 (defn init
   []
+  (rf/dispatch [::set-input-model placeholder-input-model])
   #_
   (rf/dispatch-sync [::set-count 0]))
