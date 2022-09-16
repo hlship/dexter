@@ -3,13 +3,13 @@
     [net.lewisship.dex.views :as views]
     [reagent.dom :as rd]))
 
-
+;; The metadata causes this to be re-executed after code reloads:
 (defn ^:dev/after-load mount-views
   []
-  (rd/render [views/click-view]
+  (rd/render [views/flow-panel]
              (js/document.getElementById "root")))
 
-;; The metadata causes this to be re-executed after code reloads
+;; This is referenced from shadow-cljs.edn:
 (defn init
   []
   (views/init)

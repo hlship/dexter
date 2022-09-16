@@ -12,8 +12,12 @@ of a project.
 - [Reagent](https://github.com/reagent-project/reagent)
 - [React Flow](https://reactflow.dev/)
 - [React](https://reactjs.org/)
+- [ClojureScript/Calva](https://blog.agical.se/en/posts/shadow-cljs-clojure-cljurescript-calva-nrepl-basics/)
+
 
 ## Starting the App
+
+> May have to `nvm use node` first to use a more recent version of Node than the Nu toolset uses.
 
 ```clojure
 shadow-cljs watch frontend
