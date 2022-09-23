@@ -38,13 +38,13 @@
                     :let [on-id' (str on-id)]]
                 {:id (str id' "->" on-id')
                  :source id'
-                 :target on-id'})]
+                 :target on-id'
+                 :markerEnd {:type "arrowclosed"}})]
     {:id id'
-     :type "default"                                        ; can have inputs and outputs
      :data {:label (str id' " " version)}
      :edges edges
-     :targetPosition "left"
-     :sourcePosition "right"
+     :targetPosition :left
+     :sourcePosition :right
      :dependencies (->> edges
                         (map :target)
                         set)}))
@@ -64,7 +64,8 @@
              :version "0.1.33"}
             {:id io.aviso/config
              :version "0.2.2"
-             :dependencies [{:on com.stuartsierra/component}]}
+             :dependencies [{:on com.stuartsierra/component}
+                            {:on org.clojure/core.async}]}
             {:id com.stuartsierra/component
              :version "0.3.1"
              :dependencies [{:on com.stuartsierra/dependency}]}
@@ -72,14 +73,38 @@
              :version "0.2.0"}
             {:id org.clojure/core.async
              :version "0.2.395"
-             :dependencies [{:on org.clojure/tools.analyzer.jvm}]}
+             :dependencies [{:on org.clojure/tools.analyzer.jvm}
+                            {:on io.aviso/pretty}]}
             {:id org.clojure/tools.analyzer.jvm
              :version "0.6.10"}]})
 
+(defn node-type
+  [{:keys [id dependencies]} target-nodes]
+  (let [has-outgoing (seq dependencies)
+        has-incoming (contains? target-nodes id)]
+    (cond
+      (and has-incoming has-outgoing) :regular
+      ;; This is slightly confusing, as react-flow is intended for data flowing from an input node
+      ;; (one that has no incoming dependencies) through regular nodes, to an output node
+      ;; (one that has no outgoing dependencies).  So these two seem slightly backwards
+      ;; as we care about the artifact relationships.
+      has-outgoing :input
+      has-incoming :output
+
+      :else
+      (do
+        (prn "What's up with node" id)
+        "regular"))))
+
 (defn build-view-nodes
   [input-model]
-  (map input-node->view-node (:nodes input-model)))
-
+  (let [nodes (map input-node->view-node (:nodes input-model))
+        target-nodes (->> nodes
+                          (map :dependencies)
+                          (reduce into #{}))]
+    (->> nodes
+         (map #(assoc % :type (node-type % target-nodes)))
+         (medley/index-by :id))))
 
 (def ^:const node-width 160)
 (def ^:const node-height 50)
@@ -114,9 +139,7 @@
 
 (reg-sub ::view-nodes
          :<- [::input-model]
-         :-> (fn [input-model]
-               (let [nodes (map input-node->view-node (:nodes input-model))]
-                 (medley/index-by :id nodes))))
+         :-> build-view-nodes)
 
 (reg-sub ::focus-node-id
          :-> ::focus-node-id)
@@ -126,7 +149,6 @@
          :<- [::focus-node-id]
          ;; Gets a single argument, no event
          :-> (fn [[view-nodes focus-node-id]]
-               (prn ::focus-node)
                (get view-nodes focus-node-id)))
 
 (reg-sub ::dependents
@@ -172,27 +194,17 @@
                       (mapcat :edges)
                       (filter relevant-edge?)))))
 
-(defn flow
+(defn flow-panel
   []
   (let [nodes (<sub [::view-ready-nodes])
         edges (<sub [::edges])]
     [:div.app-flow-container
      ;; :> converts the top level map to a JS map, but doesn't do so recursively.
-     (when nodes
+     (when (seq nodes)
        [:> ReactFlow {:nodes (clj->js nodes)
                       :edges (clj->js edges)
                       :onNodeClick (fn [_event node]
                                      (rf/dispatch [::select-focus-node (.-id node)]))}])]))
-
-(defn flow-panel
-  []
-  [:div
-   [flow]
-   [:hr]
-   [:b "After Flow"]])
-
 (defn init
   []
-  (rf/dispatch [::set-input-model placeholder-input-model])
-  #_
-  (rf/dispatch-sync [::set-count 0]))
+  (rf/dispatch [::set-input-model placeholder-input-model]))
