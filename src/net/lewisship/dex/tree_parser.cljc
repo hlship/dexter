@@ -41,7 +41,6 @@
 
 (defn- extract-version
   [coord-id]
-  (prn :extract-version coord-id)
   (or (:mvn/version coord-id)
       (:git/sha coord-id)
       (:sha coord-id)                                       ; deprecated
@@ -64,7 +63,7 @@
                                   (assoc artifacts child-artifact-id
                                          {:id child-artifact-id
                                           :version version}))
-                     new-dependency {:on child-artifact-id
+                     new-dependency {:id child-artifact-id
                                      :version version}]
                  ;; Always add a dependency from this artifact to the child, and if the child is
                  ;; included, recursively add its dependencies.
@@ -76,7 +75,8 @@
 (defn parse-edn
   "Parse the EDN output of `clj -X:deps tree :format :edn` into the input model used by the views."
   [root-artifact-id root-version tree-edn]
-  (let [artifacts (gather {root-artifact-id {:id root-artifact-id :version root-version}}
+  (let [artifacts (gather {root-artifact-id {:id root-artifact-id
+                                             :version root-version}}
                           root-artifact-id
                           (:children tree-edn))]
     {:nodes (->> artifacts vals (sort-by :id) (into []))
