@@ -1,0 +1,1541 @@
+{:children
+ {org.clojure/clojure
+  {:path [],
+   :coord {:mvn/version "1.11.1", :deps/manifest :mvn},
+   :children
+   #:org.clojure{spec.alpha
+                 {:path [org.clojure/clojure],
+                  :lib org.clojure/spec.alpha,
+                  :coord {:mvn/version "0.3.218", :deps/manifest :mvn},
+                  :orig-coord #:mvn{:version "0.3.218"},
+                  :coord-id #:mvn{:version "0.3.218"},
+                  :include true,
+                  :reason :new-dep,
+                  :step 8},
+                 core.specs.alpha
+                 {:path [org.clojure/clojure],
+                  :lib org.clojure/core.specs.alpha,
+                  :coord {:mvn/version "0.2.62", :deps/manifest :mvn},
+                  :orig-coord #:mvn{:version "0.2.62"},
+                  :coord-id #:mvn{:version "0.2.62"},
+                  :include true,
+                  :reason :new-dep,
+                  :step 9}},
+   :orig-coord #:mvn{:version "1.11.1"},
+   :include true,
+   :reason :new-top-dep,
+   :lib org.clojure/clojure,
+   :coord-id #:mvn{:version "1.11.1"},
+   :step 0},
+  io.aviso/logging
+  {:path [],
+   :coord {:mvn/version "1.0", :deps/manifest :mvn},
+   :children
+   {org.clojure/clojure
+    {:path [io.aviso/logging],
+     :lib org.clojure/clojure,
+     :coord {:mvn/version "1.8.0", :deps/manifest :mvn},
+     :orig-coord #:mvn{:version "1.8.0"},
+     :coord-id #:mvn{:version "1.8.0"},
+     :include false,
+     :reason :use-top,
+     :step 10},
+    org.slf4j/slf4j-api
+    {:path [io.aviso/logging],
+     :lib org.slf4j/slf4j-api,
+     :coord {:mvn/version "1.7.30", :deps/manifest :mvn},
+     :orig-coord #:mvn{:version "1.7.30"},
+     :coord-id #:mvn{:version "1.7.30"},
+     :include false,
+     :reason :superseded,
+     :step 11},
+    ch.qos.logback/logback-classic
+    {:path [io.aviso/logging],
+     :coord {:mvn/version "1.2.3", :deps/manifest :mvn},
+     :children
+     {ch.qos.logback/logback-core
+      {:path [io.aviso/logging ch.qos.logback/logback-classic],
+       :lib ch.qos.logback/logback-core,
+       :coord {:mvn/version "1.2.3", :deps/manifest :mvn},
+       :orig-coord #:mvn{:version "1.2.3"},
+       :coord-id #:mvn{:version "1.2.3"},
+       :include true,
+       :reason :new-dep,
+       :step 41},
+      org.slf4j/slf4j-api
+      {:path [io.aviso/logging ch.qos.logback/logback-classic],
+       :lib org.slf4j/slf4j-api,
+       :coord {:mvn/version "1.7.25", :deps/manifest :mvn},
+       :orig-coord #:mvn{:version "1.7.25"},
+       :coord-id #:mvn{:version "1.7.25"},
+       :include false,
+       :reason :older-version,
+       :step 42}},
+     :orig-coord #:mvn{:version "1.2.3"},
+     :include true,
+     :reason :new-dep,
+     :lib ch.qos.logback/logback-classic,
+     :coord-id #:mvn{:version "1.2.3"},
+     :step 12},
+    org.clojure/tools.logging
+    {:path [io.aviso/logging],
+     :coord {:mvn/version "1.1.0", :deps/manifest :mvn},
+     :children
+     #:org.clojure{clojure
+                   {:path [io.aviso/logging org.clojure/tools.logging],
+                    :lib org.clojure/clojure,
+                    :coord {:mvn/version "1.4.0", :deps/manifest :mvn},
+                    :orig-coord #:mvn{:version "1.4.0"},
+                    :coord-id #:mvn{:version "1.4.0"},
+                    :include false,
+                    :reason :use-top,
+                    :step 43}},
+     :orig-coord #:mvn{:version "1.1.0"},
+     :include true,
+     :reason :new-dep,
+     :lib org.clojure/tools.logging,
+     :coord-id #:mvn{:version "1.1.0"},
+     :step 13},
+    io.aviso/pretty
+    {:path [io.aviso/logging],
+     :coord {:mvn/version "1.1", :deps/manifest :mvn},
+     :children
+     #:org.clojure{clojure
+                   {:path [io.aviso/logging io.aviso/pretty],
+                    :lib org.clojure/clojure,
+                    :coord {:mvn/version "1.7.0", :deps/manifest :mvn},
+                    :orig-coord #:mvn{:version "1.7.0"},
+                    :coord-id #:mvn{:version "1.7.0"},
+                    :include false,
+                    :reason :use-top,
+                    :step 44}},
+     :orig-coord #:mvn{:version "1.1"},
+     :include false,
+     :reason :superseded,
+     :lib io.aviso/pretty,
+     :coord-id #:mvn{:version "1.1"},
+     :step 14},
+    org.slf4j/jcl-over-slf4j
+    {:path [io.aviso/logging],
+     :coord {:mvn/version "1.7.30", :deps/manifest :mvn},
+     :children
+     #:org.slf4j{slf4j-api
+                 {:path [io.aviso/logging org.slf4j/jcl-over-slf4j],
+                  :lib org.slf4j/slf4j-api,
+                  :coord {:mvn/version "1.7.30", :deps/manifest :mvn},
+                  :orig-coord #:mvn{:version "1.7.30"},
+                  :coord-id #:mvn{:version "1.7.30"},
+                  :include false,
+                  :reason :parent-omitted,
+                  :step 45}},
+     :orig-coord #:mvn{:version "1.7.30"},
+     :include false,
+     :reason :superseded,
+     :lib org.slf4j/jcl-over-slf4j,
+     :coord-id #:mvn{:version "1.7.30"},
+     :step 15}},
+   :orig-coord #:mvn{:version "1.0"},
+   :include true,
+   :reason :new-top-dep,
+   :lib io.aviso/logging,
+   :coord-id #:mvn{:version "1.0"},
+   :step 1},
+  com.datomic/datomic-pro
+  {:path [],
+   :coord {:mvn/version "1.0.6522", :deps/manifest :mvn},
+   :children
+   {org.clojure/clojure
+    {:path [com.datomic/datomic-pro],
+     :lib org.clojure/clojure,
+     :coord {:mvn/version "1.8.0", :deps/manifest :mvn},
+     :orig-coord #:mvn{:version "1.8.0"},
+     :coord-id #:mvn{:version "1.8.0"},
+     :include false,
+     :reason :use-top,
+     :step 16},
+    commons-codec/commons-codec
+    {:path [com.datomic/datomic-pro],
+     :lib commons-codec/commons-codec,
+     :coord {:mvn/version "1.15", :deps/manifest :mvn},
+     :orig-coord #:mvn{:version "1.15"},
+     :coord-id #:mvn{:version "1.15"},
+     :include true,
+     :reason :new-dep,
+     :step 19},
+    org.clojure/tools.cli
+    {:path [com.datomic/datomic-pro],
+     :lib org.clojure/tools.cli,
+     :coord
+     {:mvn/version "1.0.206",
+      :exclusions #{org.clojure/clojure},
+      :deps/manifest :mvn},
+     :orig-coord
+     {:mvn/version "1.0.206", :exclusions #{org.clojure/clojure}},
+     :coord-id #:mvn{:version "1.0.206"},
+     :include true,
+     :reason :new-dep,
+     :step 17},
+    org.slf4j/jcl-over-slf4j
+    {:path [com.datomic/datomic-pro],
+     :coord {:mvn/version "1.7.36", :deps/manifest :mvn},
+     :children
+     #:org.slf4j{slf4j-api
+                 {:path
+                  [com.datomic/datomic-pro org.slf4j/jcl-over-slf4j],
+                  :lib org.slf4j/slf4j-api,
+                  :coord {:mvn/version "1.7.36", :deps/manifest :mvn},
+                  :orig-coord #:mvn{:version "1.7.36"},
+                  :coord-id #:mvn{:version "1.7.36"},
+                  :include false,
+                  :reason :same-version,
+                  :step 48}},
+     :orig-coord #:mvn{:version "1.7.36"},
+     :include true,
+     :reason :newer-version,
+     :lib org.slf4j/jcl-over-slf4j,
+     :coord-id #:mvn{:version "1.7.36"},
+     :step 23},
+    com.h2database/h2
+    {:path [com.datomic/datomic-pro],
+     :lib com.h2database/h2,
+     :coord {:mvn/version "1.3.171", :deps/manifest :mvn},
+     :orig-coord #:mvn{:version "1.3.171"},
+     :coord-id #:mvn{:version "1.3.171"},
+     :include true,
+     :reason :new-dep,
+     :step 26},
+    org.apache.tomcat/tomcat-jdbc
+    {:path [com.datomic/datomic-pro],
+     :coord
+     {:mvn/version "7.0.109",
+      :exclusions #{commons-logging/commons-logging},
+      :deps/manifest :mvn},
+     :children
+     #:org.apache.tomcat{tomcat-juli
+                         {:path
+                          [com.datomic/datomic-pro
+                           org.apache.tomcat/tomcat-jdbc],
+                          :lib org.apache.tomcat/tomcat-juli,
+                          :coord
+                          {:mvn/version "7.0.109",
+                           :deps/manifest :mvn},
+                          :orig-coord #:mvn{:version "7.0.109"},
+                          :coord-id #:mvn{:version "7.0.109"},
+                          :include true,
+                          :reason :new-dep,
+                          :step 66}},
+     :orig-coord
+     {:mvn/version "7.0.109",
+      :exclusions #{commons-logging/commons-logging}},
+     :include true,
+     :reason :new-dep,
+     :lib org.apache.tomcat/tomcat-jdbc,
+     :coord-id #:mvn{:version "7.0.109"},
+     :step 31},
+    org.slf4j/jul-to-slf4j
+    {:path [com.datomic/datomic-pro],
+     :coord {:mvn/version "1.7.36", :deps/manifest :mvn},
+     :children
+     #:org.slf4j{slf4j-api
+                 {:path
+                  [com.datomic/datomic-pro org.slf4j/jul-to-slf4j],
+                  :lib org.slf4j/slf4j-api,
+                  :coord {:mvn/version "1.7.36", :deps/manifest :mvn},
+                  :orig-coord #:mvn{:version "1.7.36"},
+                  :coord-id #:mvn{:version "1.7.36"},
+                  :include false,
+                  :reason :same-version,
+                  :step 46}},
+     :orig-coord #:mvn{:version "1.7.36"},
+     :include true,
+     :reason :new-dep,
+     :lib org.slf4j/jul-to-slf4j,
+     :coord-id #:mvn{:version "1.7.36"},
+     :step 20},
+    com.datomic/memcache-asg-java-client
+    {:path [com.datomic/datomic-pro],
+     :lib com.datomic/memcache-asg-java-client,
+     :coord {:mvn/version "1.1.0.33", :deps/manifest :mvn},
+     :orig-coord #:mvn{:version "1.1.0.33"},
+     :coord-id #:mvn{:version "1.1.0.33"},
+     :include true,
+     :reason :new-dep,
+     :step 29},
+    com.datomic/query-support
+    {:path [com.datomic/datomic-pro],
+     :lib com.datomic/query-support,
+     :coord {:mvn/version "0.8.28", :deps/manifest :mvn},
+     :orig-coord #:mvn{:version "0.8.28"},
+     :coord-id #:mvn{:version "0.8.28"},
+     :include true,
+     :reason :new-dep,
+     :step 25},
+    org.fressian/fressian
+    {:path [com.datomic/datomic-pro],
+     :lib org.fressian/fressian,
+     :coord {:mvn/version "0.6.6", :deps/manifest :mvn},
+     :orig-coord #:mvn{:version "0.6.6"},
+     :coord-id #:mvn{:version "0.6.6"},
+     :include true,
+     :reason :new-dep,
+     :step 18},
+    org.apache.httpcomponents/httpclient
+    {:path [com.datomic/datomic-pro],
+     :coord
+     {:mvn/version "4.5.9",
+      :exclusions #{commons-logging/commons-logging},
+      :deps/manifest :mvn},
+     :children
+     {org.apache.httpcomponents/httpcore
+      {:path
+       [com.datomic/datomic-pro org.apache.httpcomponents/httpclient],
+       :lib org.apache.httpcomponents/httpcore,
+       :coord {:mvn/version "4.4.11", :deps/manifest :mvn},
+       :orig-coord #:mvn{:version "4.4.11"},
+       :coord-id #:mvn{:version "4.4.11"},
+       :include true,
+       :reason :new-dep,
+       :step 64},
+      commons-codec/commons-codec
+      {:path
+       [com.datomic/datomic-pro org.apache.httpcomponents/httpclient],
+       :lib commons-codec/commons-codec,
+       :coord {:mvn/version "1.11", :deps/manifest :mvn},
+       :orig-coord #:mvn{:version "1.11"},
+       :coord-id #:mvn{:version "1.11"},
+       :include false,
+       :reason :older-version,
+       :step 65}},
+     :orig-coord
+     {:mvn/version "4.5.9",
+      :exclusions #{commons-logging/commons-logging}},
+     :include true,
+     :reason :new-dep,
+     :lib org.apache.httpcomponents/httpclient,
+     :coord-id #:mvn{:version "4.5.9"},
+     :step 30},
+    org.apache.activemq/artemis-core-client
+    {:path [com.datomic/datomic-pro],
+     :coord
+     {:mvn/version "2.19.1",
+      :exclusions
+      #{org.jgroups/jgroups commons-logging/commons-logging},
+      :deps/manifest :mvn},
+     :children
+     {io.netty/netty-common
+      {:path
+       [com.datomic/datomic-pro
+        org.apache.activemq/artemis-core-client],
+       :lib io.netty/netty-common,
+       :coord {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+       :orig-coord #:mvn{:version "4.1.73.Final"},
+       :coord-id #:mvn{:version "4.1.73.Final"},
+       :include true,
+       :reason :new-dep,
+       :step 61},
+      io.netty/netty-transport-native-kqueue$osx-x86_64
+      {:path
+       [com.datomic/datomic-pro
+        org.apache.activemq/artemis-core-client],
+       :coord {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+       :children
+       #:io.netty{netty-common
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-transport-native-kqueue$osx-x86_64],
+                   :lib io.netty/netty-common,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 82},
+                  netty-buffer
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-transport-native-kqueue$osx-x86_64],
+                   :lib io.netty/netty-buffer,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 83},
+                  netty-transport
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-transport-native-kqueue$osx-x86_64],
+                   :lib io.netty/netty-transport,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 84},
+                  netty-transport-native-unix-common
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-transport-native-kqueue$osx-x86_64],
+                   :lib io.netty/netty-transport-native-unix-common,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 85},
+                  netty-transport-classes-kqueue
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-transport-native-kqueue$osx-x86_64],
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :children
+                   #:io.netty{netty-common
+                              {:path
+                               [com.datomic/datomic-pro
+                                org.apache.activemq/artemis-core-client
+                                io.netty/netty-transport-native-kqueue$osx-x86_64
+                                io.netty/netty-transport-classes-kqueue],
+                               :lib io.netty/netty-common,
+                               :coord
+                               {:mvn/version "4.1.73.Final",
+                                :deps/manifest :mvn},
+                               :orig-coord
+                               #:mvn{:version "4.1.73.Final"},
+                               :coord-id
+                               #:mvn{:version "4.1.73.Final"},
+                               :include false,
+                               :reason :same-version,
+                               :step 124},
+                              netty-buffer
+                              {:path
+                               [com.datomic/datomic-pro
+                                org.apache.activemq/artemis-core-client
+                                io.netty/netty-transport-native-kqueue$osx-x86_64
+                                io.netty/netty-transport-classes-kqueue],
+                               :lib io.netty/netty-buffer,
+                               :coord
+                               {:mvn/version "4.1.73.Final",
+                                :deps/manifest :mvn},
+                               :orig-coord
+                               #:mvn{:version "4.1.73.Final"},
+                               :coord-id
+                               #:mvn{:version "4.1.73.Final"},
+                               :include false,
+                               :reason :same-version,
+                               :step 125},
+                              netty-transport
+                              {:path
+                               [com.datomic/datomic-pro
+                                org.apache.activemq/artemis-core-client
+                                io.netty/netty-transport-native-kqueue$osx-x86_64
+                                io.netty/netty-transport-classes-kqueue],
+                               :lib io.netty/netty-transport,
+                               :coord
+                               {:mvn/version "4.1.73.Final",
+                                :deps/manifest :mvn},
+                               :orig-coord
+                               #:mvn{:version "4.1.73.Final"},
+                               :coord-id
+                               #:mvn{:version "4.1.73.Final"},
+                               :include false,
+                               :reason :same-version,
+                               :step 126},
+                              netty-transport-native-unix-common
+                              {:path
+                               [com.datomic/datomic-pro
+                                org.apache.activemq/artemis-core-client
+                                io.netty/netty-transport-native-kqueue$osx-x86_64
+                                io.netty/netty-transport-classes-kqueue],
+                               :lib
+                               io.netty/netty-transport-native-unix-common,
+                               :coord
+                               {:mvn/version "4.1.73.Final",
+                                :deps/manifest :mvn},
+                               :orig-coord
+                               #:mvn{:version "4.1.73.Final"},
+                               :coord-id
+                               #:mvn{:version "4.1.73.Final"},
+                               :include false,
+                               :reason :same-version,
+                               :step 127}},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :include true,
+                   :reason :new-dep,
+                   :lib io.netty/netty-transport-classes-kqueue,
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :step 86}},
+       :orig-coord #:mvn{:version "4.1.73.Final"},
+       :include true,
+       :reason :new-dep,
+       :lib io.netty/netty-transport-native-kqueue$osx-x86_64,
+       :coord-id #:mvn{:version "4.1.73.Final"},
+       :step 53},
+      io.netty/netty-handler-proxy
+      {:path
+       [com.datomic/datomic-pro
+        org.apache.activemq/artemis-core-client],
+       :coord {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+       :children
+       #:io.netty{netty-common
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-handler-proxy],
+                   :lib io.netty/netty-common,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 102},
+                  netty-buffer
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-handler-proxy],
+                   :lib io.netty/netty-buffer,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 103},
+                  netty-transport
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-handler-proxy],
+                   :lib io.netty/netty-transport,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 104},
+                  netty-codec
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-handler-proxy],
+                   :lib io.netty/netty-codec,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 105},
+                  netty-codec-socks
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-handler-proxy],
+                   :lib io.netty/netty-codec-socks,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 106},
+                  netty-codec-http
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-handler-proxy],
+                   :lib io.netty/netty-codec-http,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 107}},
+       :orig-coord #:mvn{:version "4.1.73.Final"},
+       :include true,
+       :reason :new-dep,
+       :lib io.netty/netty-handler-proxy,
+       :coord-id #:mvn{:version "4.1.73.Final"},
+       :step 58},
+      io.netty/netty-codec
+      {:path
+       [com.datomic/datomic-pro
+        org.apache.activemq/artemis-core-client],
+       :coord {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+       :children
+       #:io.netty{netty-common
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-codec],
+                   :lib io.netty/netty-common,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 108},
+                  netty-buffer
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-codec],
+                   :lib io.netty/netty-buffer,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 109},
+                  netty-transport
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-codec],
+                   :lib io.netty/netty-transport,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 110}},
+       :orig-coord #:mvn{:version "4.1.73.Final"},
+       :include true,
+       :reason :new-dep,
+       :lib io.netty/netty-codec,
+       :coord-id #:mvn{:version "4.1.73.Final"},
+       :step 59},
+      io.netty/netty-codec-socks
+      {:path
+       [com.datomic/datomic-pro
+        org.apache.activemq/artemis-core-client],
+       :coord {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+       :children
+       #:io.netty{netty-common
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-codec-socks],
+                   :lib io.netty/netty-common,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 111},
+                  netty-buffer
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-codec-socks],
+                   :lib io.netty/netty-buffer,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 112},
+                  netty-transport
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-codec-socks],
+                   :lib io.netty/netty-transport,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 113},
+                  netty-codec
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-codec-socks],
+                   :lib io.netty/netty-codec,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 114}},
+       :orig-coord #:mvn{:version "4.1.73.Final"},
+       :include true,
+       :reason :new-dep,
+       :lib io.netty/netty-codec-socks,
+       :coord-id #:mvn{:version "4.1.73.Final"},
+       :step 60},
+      org.apache.johnzon/johnzon-core
+      {:path
+       [com.datomic/datomic-pro
+        org.apache.activemq/artemis-core-client],
+       :lib org.apache.johnzon/johnzon-core,
+       :coord {:mvn/version "0.9.5", :deps/manifest :mvn},
+       :orig-coord #:mvn{:version "0.9.5"},
+       :coord-id #:mvn{:version "0.9.5"},
+       :include true,
+       :reason :new-dep,
+       :step 51},
+      org.apache.activemq/artemis-commons
+      {:path
+       [com.datomic/datomic-pro
+        org.apache.activemq/artemis-core-client],
+       :coord {:mvn/version "2.19.1", :deps/manifest :mvn},
+       :children
+       {org.jboss.logging/jboss-logging
+        {:path
+         [com.datomic/datomic-pro
+          org.apache.activemq/artemis-core-client
+          org.apache.activemq/artemis-commons],
+         :lib org.jboss.logging/jboss-logging,
+         :coord {:mvn/version "3.4.2.Final", :deps/manifest :mvn},
+         :orig-coord #:mvn{:version "3.4.2.Final"},
+         :coord-id #:mvn{:version "3.4.2.Final"},
+         :include true,
+         :reason :new-dep,
+         :step 71},
+        io.netty/netty-buffer
+        {:path
+         [com.datomic/datomic-pro
+          org.apache.activemq/artemis-core-client
+          org.apache.activemq/artemis-commons],
+         :lib io.netty/netty-buffer,
+         :coord {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+         :orig-coord #:mvn{:version "4.1.73.Final"},
+         :coord-id #:mvn{:version "4.1.73.Final"},
+         :include false,
+         :reason :same-version,
+         :step 72},
+        io.netty/netty-transport
+        {:path
+         [com.datomic/datomic-pro
+          org.apache.activemq/artemis-core-client
+          org.apache.activemq/artemis-commons],
+         :lib io.netty/netty-transport,
+         :coord {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+         :orig-coord #:mvn{:version "4.1.73.Final"},
+         :coord-id #:mvn{:version "4.1.73.Final"},
+         :include false,
+         :reason :same-version,
+         :step 73},
+        io.netty/netty-handler
+        {:path
+         [com.datomic/datomic-pro
+          org.apache.activemq/artemis-core-client
+          org.apache.activemq/artemis-commons],
+         :lib io.netty/netty-handler,
+         :coord {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+         :orig-coord #:mvn{:version "4.1.73.Final"},
+         :coord-id #:mvn{:version "4.1.73.Final"},
+         :include false,
+         :reason :same-version,
+         :step 74},
+        commons-beanutils/commons-beanutils
+        {:path
+         [com.datomic/datomic-pro
+          org.apache.activemq/artemis-core-client
+          org.apache.activemq/artemis-commons],
+         :coord {:mvn/version "1.9.4", :deps/manifest :mvn},
+         :children
+         {commons-logging/commons-logging
+          {:path
+           [com.datomic/datomic-pro
+            org.apache.activemq/artemis-core-client
+            org.apache.activemq/artemis-commons
+            commons-beanutils/commons-beanutils],
+           :lib commons-logging/commons-logging,
+           :coord {:mvn/version "1.2", :deps/manifest :mvn},
+           :orig-coord #:mvn{:version "1.2"},
+           :coord-id #:mvn{:version "1.2"},
+           :include false,
+           :reason :excluded,
+           :step 115},
+          commons-collections/commons-collections
+          {:path
+           [com.datomic/datomic-pro
+            org.apache.activemq/artemis-core-client
+            org.apache.activemq/artemis-commons
+            commons-beanutils/commons-beanutils],
+           :lib commons-collections/commons-collections,
+           :coord {:mvn/version "3.2.2", :deps/manifest :mvn},
+           :orig-coord #:mvn{:version "3.2.2"},
+           :coord-id #:mvn{:version "3.2.2"},
+           :include true,
+           :reason :new-dep,
+           :step 116}},
+         :orig-coord #:mvn{:version "1.9.4"},
+         :include true,
+         :reason :new-dep,
+         :lib commons-beanutils/commons-beanutils,
+         :coord-id #:mvn{:version "1.9.4"},
+         :step 75},
+        jakarta.json/jakarta.json-api
+        {:path
+         [com.datomic/datomic-pro
+          org.apache.activemq/artemis-core-client
+          org.apache.activemq/artemis-commons],
+         :lib jakarta.json/jakarta.json-api,
+         :coord {:mvn/version "1.1.6", :deps/manifest :mvn},
+         :orig-coord #:mvn{:version "1.1.6"},
+         :coord-id #:mvn{:version "1.1.6"},
+         :include false,
+         :reason :same-version,
+         :step 76}},
+       :orig-coord #:mvn{:version "2.19.1"},
+       :include true,
+       :reason :new-dep,
+       :lib org.apache.activemq/artemis-commons,
+       :coord-id #:mvn{:version "2.19.1"},
+       :step 49},
+      io.netty/netty-buffer
+      {:path
+       [com.datomic/datomic-pro
+        org.apache.activemq/artemis-core-client],
+       :coord {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+       :children
+       #:io.netty{netty-common
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-buffer],
+                   :lib io.netty/netty-common,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 92}},
+       :orig-coord #:mvn{:version "4.1.73.Final"},
+       :include true,
+       :reason :new-dep,
+       :lib io.netty/netty-buffer,
+       :coord-id #:mvn{:version "4.1.73.Final"},
+       :step 55},
+      io.netty/netty-handler
+      {:path
+       [com.datomic/datomic-pro
+        org.apache.activemq/artemis-core-client],
+       :coord {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+       :children
+       #:io.netty{netty-common
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-handler],
+                   :lib io.netty/netty-common,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 96},
+                  netty-resolver
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-handler],
+                   :lib io.netty/netty-resolver,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 97},
+                  netty-buffer
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-handler],
+                   :lib io.netty/netty-buffer,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 98},
+                  netty-transport
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-handler],
+                   :lib io.netty/netty-transport,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 99},
+                  netty-codec
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-handler],
+                   :lib io.netty/netty-codec,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 100},
+                  netty-tcnative-classes
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-handler],
+                   :lib io.netty/netty-tcnative-classes,
+                   :coord
+                   {:mvn/version "2.0.46.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "2.0.46.Final"},
+                   :coord-id #:mvn{:version "2.0.46.Final"},
+                   :include true,
+                   :reason :new-dep,
+                   :step 101}},
+       :orig-coord #:mvn{:version "4.1.73.Final"},
+       :include true,
+       :reason :new-dep,
+       :lib io.netty/netty-handler,
+       :coord-id #:mvn{:version "4.1.73.Final"},
+       :step 57},
+      jakarta.json/jakarta.json-api
+      {:path
+       [com.datomic/datomic-pro
+        org.apache.activemq/artemis-core-client],
+       :lib jakarta.json/jakarta.json-api,
+       :coord {:mvn/version "1.1.6", :deps/manifest :mvn},
+       :orig-coord #:mvn{:version "1.1.6"},
+       :coord-id #:mvn{:version "1.1.6"},
+       :include true,
+       :reason :new-dep,
+       :step 50},
+      io.netty/netty-transport-native-epoll$linux-x86_64
+      {:path
+       [com.datomic/datomic-pro
+        org.apache.activemq/artemis-core-client],
+       :coord {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+       :children
+       #:io.netty{netty-common
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-transport-native-epoll$linux-x86_64],
+                   :lib io.netty/netty-common,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 77},
+                  netty-buffer
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-transport-native-epoll$linux-x86_64],
+                   :lib io.netty/netty-buffer,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 78},
+                  netty-transport
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-transport-native-epoll$linux-x86_64],
+                   :lib io.netty/netty-transport,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 79},
+                  netty-transport-native-unix-common
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-transport-native-epoll$linux-x86_64],
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :children
+                   #:io.netty{netty-common
+                              {:path
+                               [com.datomic/datomic-pro
+                                org.apache.activemq/artemis-core-client
+                                io.netty/netty-transport-native-epoll$linux-x86_64
+                                io.netty/netty-transport-native-unix-common],
+                               :lib io.netty/netty-common,
+                               :coord
+                               {:mvn/version "4.1.73.Final",
+                                :deps/manifest :mvn},
+                               :orig-coord
+                               #:mvn{:version "4.1.73.Final"},
+                               :coord-id
+                               #:mvn{:version "4.1.73.Final"},
+                               :include false,
+                               :reason :same-version,
+                               :step 117},
+                              netty-buffer
+                              {:path
+                               [com.datomic/datomic-pro
+                                org.apache.activemq/artemis-core-client
+                                io.netty/netty-transport-native-epoll$linux-x86_64
+                                io.netty/netty-transport-native-unix-common],
+                               :lib io.netty/netty-buffer,
+                               :coord
+                               {:mvn/version "4.1.73.Final",
+                                :deps/manifest :mvn},
+                               :orig-coord
+                               #:mvn{:version "4.1.73.Final"},
+                               :coord-id
+                               #:mvn{:version "4.1.73.Final"},
+                               :include false,
+                               :reason :same-version,
+                               :step 118},
+                              netty-transport
+                              {:path
+                               [com.datomic/datomic-pro
+                                org.apache.activemq/artemis-core-client
+                                io.netty/netty-transport-native-epoll$linux-x86_64
+                                io.netty/netty-transport-native-unix-common],
+                               :lib io.netty/netty-transport,
+                               :coord
+                               {:mvn/version "4.1.73.Final",
+                                :deps/manifest :mvn},
+                               :orig-coord
+                               #:mvn{:version "4.1.73.Final"},
+                               :coord-id
+                               #:mvn{:version "4.1.73.Final"},
+                               :include false,
+                               :reason :same-version,
+                               :step 119}},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :include true,
+                   :reason :new-dep,
+                   :lib io.netty/netty-transport-native-unix-common,
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :step 80},
+                  netty-transport-classes-epoll
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-transport-native-epoll$linux-x86_64],
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :children
+                   #:io.netty{netty-common
+                              {:path
+                               [com.datomic/datomic-pro
+                                org.apache.activemq/artemis-core-client
+                                io.netty/netty-transport-native-epoll$linux-x86_64
+                                io.netty/netty-transport-classes-epoll],
+                               :lib io.netty/netty-common,
+                               :coord
+                               {:mvn/version "4.1.73.Final",
+                                :deps/manifest :mvn},
+                               :orig-coord
+                               #:mvn{:version "4.1.73.Final"},
+                               :coord-id
+                               #:mvn{:version "4.1.73.Final"},
+                               :include false,
+                               :reason :same-version,
+                               :step 120},
+                              netty-buffer
+                              {:path
+                               [com.datomic/datomic-pro
+                                org.apache.activemq/artemis-core-client
+                                io.netty/netty-transport-native-epoll$linux-x86_64
+                                io.netty/netty-transport-classes-epoll],
+                               :lib io.netty/netty-buffer,
+                               :coord
+                               {:mvn/version "4.1.73.Final",
+                                :deps/manifest :mvn},
+                               :orig-coord
+                               #:mvn{:version "4.1.73.Final"},
+                               :coord-id
+                               #:mvn{:version "4.1.73.Final"},
+                               :include false,
+                               :reason :same-version,
+                               :step 121},
+                              netty-transport
+                              {:path
+                               [com.datomic/datomic-pro
+                                org.apache.activemq/artemis-core-client
+                                io.netty/netty-transport-native-epoll$linux-x86_64
+                                io.netty/netty-transport-classes-epoll],
+                               :lib io.netty/netty-transport,
+                               :coord
+                               {:mvn/version "4.1.73.Final",
+                                :deps/manifest :mvn},
+                               :orig-coord
+                               #:mvn{:version "4.1.73.Final"},
+                               :coord-id
+                               #:mvn{:version "4.1.73.Final"},
+                               :include false,
+                               :reason :same-version,
+                               :step 122},
+                              netty-transport-native-unix-common
+                              {:path
+                               [com.datomic/datomic-pro
+                                org.apache.activemq/artemis-core-client
+                                io.netty/netty-transport-native-epoll$linux-x86_64
+                                io.netty/netty-transport-classes-epoll],
+                               :lib
+                               io.netty/netty-transport-native-unix-common,
+                               :coord
+                               {:mvn/version "4.1.73.Final",
+                                :deps/manifest :mvn},
+                               :orig-coord
+                               #:mvn{:version "4.1.73.Final"},
+                               :coord-id
+                               #:mvn{:version "4.1.73.Final"},
+                               :include false,
+                               :reason :same-version,
+                               :step 123}},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :include true,
+                   :reason :new-dep,
+                   :lib io.netty/netty-transport-classes-epoll,
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :step 81}},
+       :orig-coord #:mvn{:version "4.1.73.Final"},
+       :include true,
+       :reason :new-dep,
+       :lib io.netty/netty-transport-native-epoll$linux-x86_64,
+       :coord-id #:mvn{:version "4.1.73.Final"},
+       :step 52},
+      io.netty/netty-transport
+      {:path
+       [com.datomic/datomic-pro
+        org.apache.activemq/artemis-core-client],
+       :coord {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+       :children
+       #:io.netty{netty-common
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-transport],
+                   :lib io.netty/netty-common,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 93},
+                  netty-buffer
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-transport],
+                   :lib io.netty/netty-buffer,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 94},
+                  netty-resolver
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-transport],
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :children
+                   #:io.netty{netty-common
+                              {:path
+                               [com.datomic/datomic-pro
+                                org.apache.activemq/artemis-core-client
+                                io.netty/netty-transport
+                                io.netty/netty-resolver],
+                               :lib io.netty/netty-common,
+                               :coord
+                               {:mvn/version "4.1.73.Final",
+                                :deps/manifest :mvn},
+                               :orig-coord
+                               #:mvn{:version "4.1.73.Final"},
+                               :coord-id
+                               #:mvn{:version "4.1.73.Final"},
+                               :include false,
+                               :reason :same-version,
+                               :step 128}},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :include true,
+                   :reason :new-dep,
+                   :lib io.netty/netty-resolver,
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :step 95}},
+       :orig-coord #:mvn{:version "4.1.73.Final"},
+       :include true,
+       :reason :new-dep,
+       :lib io.netty/netty-transport,
+       :coord-id #:mvn{:version "4.1.73.Final"},
+       :step 56},
+      io.netty/netty-codec-http
+      {:path
+       [com.datomic/datomic-pro
+        org.apache.activemq/artemis-core-client],
+       :coord {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+       :children
+       #:io.netty{netty-common
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-codec-http],
+                   :lib io.netty/netty-common,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 87},
+                  netty-buffer
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-codec-http],
+                   :lib io.netty/netty-buffer,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 88},
+                  netty-transport
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-codec-http],
+                   :lib io.netty/netty-transport,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 89},
+                  netty-codec
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-codec-http],
+                   :lib io.netty/netty-codec,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 90},
+                  netty-handler
+                  {:path
+                   [com.datomic/datomic-pro
+                    org.apache.activemq/artemis-core-client
+                    io.netty/netty-codec-http],
+                   :lib io.netty/netty-handler,
+                   :coord
+                   {:mvn/version "4.1.73.Final", :deps/manifest :mvn},
+                   :orig-coord #:mvn{:version "4.1.73.Final"},
+                   :coord-id #:mvn{:version "4.1.73.Final"},
+                   :include false,
+                   :reason :same-version,
+                   :step 91}},
+       :orig-coord #:mvn{:version "4.1.73.Final"},
+       :include true,
+       :reason :new-dep,
+       :lib io.netty/netty-codec-http,
+       :coord-id #:mvn{:version "4.1.73.Final"},
+       :step 54}},
+     :orig-coord
+     {:mvn/version "2.19.1",
+      :exclusions
+      #{org.jgroups/jgroups commons-logging/commons-logging}},
+     :include true,
+     :reason :new-dep,
+     :lib org.apache.activemq/artemis-core-client,
+     :coord-id #:mvn{:version "2.19.1"},
+     :step 24},
+    org.slf4j/slf4j-api
+    {:path [com.datomic/datomic-pro],
+     :lib org.slf4j/slf4j-api,
+     :coord {:mvn/version "1.7.36", :deps/manifest :mvn},
+     :orig-coord #:mvn{:version "1.7.36"},
+     :coord-id #:mvn{:version "1.7.36"},
+     :include true,
+     :reason :newer-version,
+     :step 21},
+    com.github.ben-manes.caffeine/caffeine
+    {:path [com.datomic/datomic-pro],
+     :coord {:mvn/version "2.8.1", :deps/manifest :mvn},
+     :children
+     {org.checkerframework/checker-qual
+      {:path
+       [com.datomic/datomic-pro
+        com.github.ben-manes.caffeine/caffeine],
+       :lib org.checkerframework/checker-qual,
+       :coord {:mvn/version "3.1.0", :deps/manifest :mvn},
+       :orig-coord #:mvn{:version "3.1.0"},
+       :coord-id #:mvn{:version "3.1.0"},
+       :include true,
+       :reason :new-dep,
+       :step 62},
+      com.google.errorprone/error_prone_annotations
+      {:path
+       [com.datomic/datomic-pro
+        com.github.ben-manes.caffeine/caffeine],
+       :lib com.google.errorprone/error_prone_annotations,
+       :coord {:mvn/version "2.3.4", :deps/manifest :mvn},
+       :orig-coord #:mvn{:version "2.3.4"},
+       :coord-id #:mvn{:version "2.3.4"},
+       :include true,
+       :reason :new-dep,
+       :step 63}},
+     :orig-coord #:mvn{:version "2.8.1"},
+     :include true,
+     :reason :new-dep,
+     :lib com.github.ben-manes.caffeine/caffeine,
+     :coord-id #:mvn{:version "2.8.1"},
+     :step 28},
+    org.codehaus.janino/commons-compiler-jdk
+    {:path [com.datomic/datomic-pro],
+     :coord {:mvn/version "3.0.12", :deps/manifest :mvn},
+     :children
+     #:org.codehaus.janino{commons-compiler
+                           {:path
+                            [com.datomic/datomic-pro
+                             org.codehaus.janino/commons-compiler-jdk],
+                            :lib org.codehaus.janino/commons-compiler,
+                            :coord
+                            {:mvn/version "3.0.12",
+                             :deps/manifest :mvn},
+                            :orig-coord #:mvn{:version "3.0.12"},
+                            :coord-id #:mvn{:version "3.0.12"},
+                            :include true,
+                            :reason :new-dep,
+                            :step 67}},
+     :orig-coord #:mvn{:version "3.0.12"},
+     :include true,
+     :reason :new-dep,
+     :lib org.codehaus.janino/commons-compiler-jdk,
+     :coord-id #:mvn{:version "3.0.12"},
+     :step 32},
+    org.slf4j/log4j-over-slf4j
+    {:path [com.datomic/datomic-pro],
+     :coord {:mvn/version "1.7.36", :deps/manifest :mvn},
+     :children
+     #:org.slf4j{slf4j-api
+                 {:path
+                  [com.datomic/datomic-pro org.slf4j/log4j-over-slf4j],
+                  :lib org.slf4j/slf4j-api,
+                  :coord {:mvn/version "1.7.36", :deps/manifest :mvn},
+                  :orig-coord #:mvn{:version "1.7.36"},
+                  :coord-id #:mvn{:version "1.7.36"},
+                  :include false,
+                  :reason :same-version,
+                  :step 47}},
+     :orig-coord #:mvn{:version "1.7.36"},
+     :include true,
+     :reason :new-dep,
+     :lib org.slf4j/log4j-over-slf4j,
+     :coord-id #:mvn{:version "1.7.36"},
+     :step 22},
+    com.datomic/datomic-lucene-core
+    {:path [com.datomic/datomic-pro],
+     :lib com.datomic/datomic-lucene-core,
+     :coord {:mvn/version "3.3.0", :deps/manifest :mvn},
+     :orig-coord #:mvn{:version "3.3.0"},
+     :coord-id #:mvn{:version "3.3.0"},
+     :include true,
+     :reason :new-dep,
+     :step 27}},
+   :orig-coord #:mvn{:version "1.0.6522"},
+   :include true,
+   :reason :new-top-dep,
+   :lib com.datomic/datomic-pro,
+   :coord-id #:mvn{:version "1.0.6522"},
+   :step 2},
+  org.clojure/data.fressian
+  {:path [],
+   :coord {:mvn/version "1.0.0", :deps/manifest :mvn},
+   :children
+   {org.clojure/clojure
+    {:path [org.clojure/data.fressian],
+     :lib org.clojure/clojure,
+     :coord {:mvn/version "1.7.0", :deps/manifest :mvn},
+     :orig-coord #:mvn{:version "1.7.0"},
+     :coord-id #:mvn{:version "1.7.0"},
+     :include false,
+     :reason :use-top,
+     :step 33},
+    org.fressian/fressian
+    {:path [org.clojure/data.fressian],
+     :lib org.fressian/fressian,
+     :coord {:mvn/version "0.6.6", :deps/manifest :mvn},
+     :orig-coord #:mvn{:version "0.6.6"},
+     :coord-id #:mvn{:version "0.6.6"},
+     :include false,
+     :reason :same-version,
+     :step 34}},
+   :orig-coord #:mvn{:version "1.0.0"},
+   :include true,
+   :reason :new-top-dep,
+   :lib org.clojure/data.fressian,
+   :coord-id #:mvn{:version "1.0.0"},
+   :step 3},
+  org.clojure/java.jmx
+  {:path [],
+   :coord {:mvn/version "1.0.0", :deps/manifest :mvn},
+   :children
+   #:org.clojure{clojure
+                 {:path [org.clojure/java.jmx],
+                  :lib org.clojure/clojure,
+                  :coord {:mvn/version "1.4.0", :deps/manifest :mvn},
+                  :orig-coord #:mvn{:version "1.4.0"},
+                  :coord-id #:mvn{:version "1.4.0"},
+                  :include false,
+                  :reason :use-top,
+                  :step 35}},
+   :orig-coord #:mvn{:version "1.0.0"},
+   :include true,
+   :reason :new-top-dep,
+   :lib org.clojure/java.jmx,
+   :coord-id #:mvn{:version "1.0.0"},
+   :step 4},
+  org.hdrhistogram/HdrHistogram
+  {:path [],
+   :lib org.hdrhistogram/HdrHistogram,
+   :coord {:mvn/version "2.1.12", :deps/manifest :mvn},
+   :orig-coord #:mvn{:version "2.1.12"},
+   :coord-id #:mvn{:version "2.1.12"},
+   :include true,
+   :reason :new-top-dep,
+   :step 5},
+  babashka/fs
+  {:path [],
+   :coord {:mvn/version "0.1.11", :deps/manifest :mvn},
+   :children
+   #:org.clojure{clojure
+                 {:path [babashka/fs],
+                  :lib org.clojure/clojure,
+                  :coord {:mvn/version "1.9.0", :deps/manifest :mvn},
+                  :orig-coord #:mvn{:version "1.9.0"},
+                  :coord-id #:mvn{:version "1.9.0"},
+                  :include false,
+                  :reason :use-top,
+                  :step 36}},
+   :orig-coord #:mvn{:version "0.1.11"},
+   :include true,
+   :reason :new-top-dep,
+   :lib babashka/fs,
+   :coord-id #:mvn{:version "0.1.11"},
+   :step 6},
+  io.github.hlship/cli-tools
+  {:path [],
+   :coord {:mvn/version "0.5", :deps/manifest :mvn},
+   :children
+   {org.clojure/clojure
+    {:path [io.github.hlship/cli-tools],
+     :lib org.clojure/clojure,
+     :coord {:mvn/version "1.10.3", :deps/manifest :mvn},
+     :orig-coord #:mvn{:version "1.10.3"},
+     :coord-id #:mvn{:version "1.10.3"},
+     :include false,
+     :reason :use-top,
+     :step 37},
+    org.clojure/tools.cli
+    {:path [io.github.hlship/cli-tools],
+     :coord {:mvn/version "1.0.206", :deps/manifest :mvn},
+     :children
+     #:org.clojure{clojure
+                   {:path
+                    [io.github.hlship/cli-tools org.clojure/tools.cli],
+                    :lib org.clojure/clojure,
+                    :coord {:mvn/version "1.8.0", :deps/manifest :mvn},
+                    :orig-coord #:mvn{:version "1.8.0"},
+                    :coord-id #:mvn{:version "1.8.0"},
+                    :include false,
+                    :reason :use-top,
+                    :step 68}},
+     :orig-coord #:mvn{:version "1.0.206"},
+     :include false,
+     :reason :same-version,
+     :lib org.clojure/tools.cli,
+     :coord-id #:mvn{:version "1.0.206"},
+     :step 38},
+    io.aviso/pretty
+    {:path [io.github.hlship/cli-tools],
+     :coord {:mvn/version "1.1.1", :deps/manifest :mvn},
+     :children
+     #:org.clojure{clojure
+                   {:path [io.github.hlship/cli-tools io.aviso/pretty],
+                    :lib org.clojure/clojure,
+                    :coord {:mvn/version "1.7.0", :deps/manifest :mvn},
+                    :orig-coord #:mvn{:version "1.7.0"},
+                    :coord-id #:mvn{:version "1.7.0"},
+                    :include false,
+                    :reason :use-top,
+                    :step 69}},
+     :orig-coord #:mvn{:version "1.1.1"},
+     :include true,
+     :reason :newer-version,
+     :lib io.aviso/pretty,
+     :coord-id #:mvn{:version "1.1.1"},
+     :step 39},
+    clj-fuzzy/clj-fuzzy
+    {:path [io.github.hlship/cli-tools],
+     :coord {:mvn/version "0.4.1", :deps/manifest :mvn},
+     :children
+     #:org.clojure{clojure
+                   {:path
+                    [io.github.hlship/cli-tools clj-fuzzy/clj-fuzzy],
+                    :lib org.clojure/clojure,
+                    :coord {:mvn/version "1.7.0", :deps/manifest :mvn},
+                    :orig-coord #:mvn{:version "1.7.0"},
+                    :coord-id #:mvn{:version "1.7.0"},
+                    :include false,
+                    :reason :use-top,
+                    :step 70}},
+     :orig-coord #:mvn{:version "0.4.1"},
+     :include true,
+     :reason :new-dep,
+     :lib clj-fuzzy/clj-fuzzy,
+     :coord-id #:mvn{:version "0.4.1"},
+     :step 40}},
+   :orig-coord #:mvn{:version "0.5"},
+   :include true,
+   :reason :new-top-dep,
+   :lib io.github.hlship/cli-tools,
+   :coord-id #:mvn{:version "0.5"},
+   :step 7}}}

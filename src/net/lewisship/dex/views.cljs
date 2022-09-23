@@ -19,13 +19,13 @@
                       :opt-un [::dependencies]))
 (s/def ::id symbol?)
 (s/def ::version string?)
-(s/def ::label string?)
 
 (s/def ::dependencies (s/coll-of ::dependency))
-;; As maps to support future case where we want to highlight the dependency on a version mis-match
-(s/def ::dependency (s/keys :req-un [::on]))
+(s/def ::dependency (s/keys :req-un [::on
+                                     ::version]))
 
 (s/def ::on symbol?)
+(s/def ::version string?)
 
 ;; Will likely need an intermediate step to handle nodes in model but not on screen.
 ;; Need to figure out positioning.
@@ -48,35 +48,6 @@
      :dependencies (->> edges
                         (map :target)
                         set)}))
-
-(def placeholder-input-model
-  '{:root-node-id org.clojure/core.async
-    :nodes [{:id walmartlabs/active-status
-             :version "0.1.15"
-             :dependencies [{:on org.clojure/clojure}
-                            {:on io.aviso/pretty}
-                            {:on io.aviso/config}
-                            {:on org.clojure/core.async}]
-             :label "walmartlabs/active-status 0.1.15"}
-            {:id org.clojure/clojure
-             :version "1.9.0-alpha14"}
-            {:id io.aviso/pretty
-             :version "0.1.33"}
-            {:id io.aviso/config
-             :version "0.2.2"
-             :dependencies [{:on com.stuartsierra/component}
-                            {:on org.clojure/core.async}]}
-            {:id com.stuartsierra/component
-             :version "0.3.1"
-             :dependencies [{:on com.stuartsierra/dependency}]}
-            {:id com.stuartsierra/dependency
-             :version "0.2.0"}
-            {:id org.clojure/core.async
-             :version "0.2.395"
-             :dependencies [{:on org.clojure/tools.analyzer.jvm}
-                            {:on io.aviso/pretty}]}
-            {:id org.clojure/tools.analyzer.jvm
-             :version "0.6.10"}]})
 
 (defn node-type
   [{:keys [id dependencies]} target-nodes]
@@ -205,6 +176,215 @@
                       :edges (clj->js edges)
                       :onNodeClick (fn [_event node]
                                      (rf/dispatch [::select-focus-node (.-id node)]))}])]))
+
+(defn- parse-sample
+  []
+  '{:nodes [{:id babashka/fs, :version "0.1.11", :dependencies [{:on org.clojure/clojure, :version "1.9.0"}]}
+            {:id ch.qos.logback/logback-classic,
+             :version "1.2.3",
+             :dependencies [{:on ch.qos.logback/logback-core, :version "1.2.3"}
+                            {:on org.slf4j/slf4j-api, :version "1.7.25"}]}
+            {:id ch.qos.logback/logback-core, :version "1.2.3"}
+            {:id clj-fuzzy/clj-fuzzy, :version "0.4.1", :dependencies [{:on org.clojure/clojure, :version "1.7.0"}]}
+            {:id com.datomic/datomic-lucene-core, :version "3.3.0"}
+            {:id com.datomic/datomic-pro,
+             :version "1.0.6522",
+             :dependencies [{:on org.clojure/clojure, :version "1.8.0"}
+                            {:on commons-codec/commons-codec, :version "1.15"}
+                            {:on org.clojure/tools.cli, :version "1.0.206"}
+                            {:on org.slf4j/jcl-over-slf4j, :version "1.7.36"}
+                            {:on com.h2database/h2, :version "1.3.171"}
+                            {:on org.apache.tomcat/tomcat-jdbc, :version "7.0.109"}
+                            {:on org.slf4j/jul-to-slf4j, :version "1.7.36"}
+                            {:on com.datomic/memcache-asg-java-client, :version "1.1.0.33"}
+                            {:on com.datomic/query-support, :version "0.8.28"}
+                            {:on org.fressian/fressian, :version "0.6.6"}
+                            {:on org.apache.httpcomponents/httpclient, :version "4.5.9"}
+                            {:on org.apache.activemq/artemis-core-client, :version "2.19.1"}
+                            {:on org.slf4j/slf4j-api, :version "1.7.36"}
+                            {:on com.github.ben-manes.caffeine/caffeine, :version "2.8.1"}
+                            {:on org.codehaus.janino/commons-compiler-jdk, :version "3.0.12"}
+                            {:on org.slf4j/log4j-over-slf4j, :version "1.7.36"}
+                            {:on com.datomic/datomic-lucene-core, :version "3.3.0"}]}
+            {:id com.datomic/memcache-asg-java-client, :version "1.1.0.33"}
+            {:id com.datomic/query-support, :version "0.8.28"}
+            {:id com.github.ben-manes.caffeine/caffeine,
+             :version "2.8.1",
+             :dependencies [{:on org.checkerframework/checker-qual, :version "3.1.0"}
+                            {:on com.google.errorprone/error_prone_annotations, :version "2.3.4"}]}
+            {:id com.google.errorprone/error_prone_annotations, :version "2.3.4"}
+            {:id com.h2database/h2, :version "1.3.171"}
+            {:id commons-beanutils/commons-beanutils,
+             :version "1.9.4",
+             :dependencies [{:on commons-logging/commons-logging, :version "1.2"}
+                            {:on commons-collections/commons-collections, :version "3.2.2"}]}
+            {:id commons-codec/commons-codec, :version "1.15"}
+            {:id commons-collections/commons-collections, :version "3.2.2"}
+            {:id example/proj,
+             :version "0.0.1",
+             :dependencies [{:on org.clojure/clojure, :version "1.11.1"}
+                            {:on io.aviso/logging, :version "1.0"}
+                            {:on com.datomic/datomic-pro, :version "1.0.6522"}
+                            {:on org.clojure/data.fressian, :version "1.0.0"}
+                            {:on org.clojure/java.jmx, :version "1.0.0"}
+                            {:on org.hdrhistogram/HdrHistogram, :version "2.1.12"}
+                            {:on babashka/fs, :version "0.1.11"}
+                            {:on io.github.hlship/cli-tools, :version "0.5"}]}
+            {:id io.aviso/logging,
+             :version "1.0",
+             :dependencies [{:on org.clojure/clojure, :version "1.8.0"}
+                            {:on org.slf4j/slf4j-api, :version "1.7.30"}
+                            {:on ch.qos.logback/logback-classic, :version "1.2.3"}
+                            {:on org.clojure/tools.logging, :version "1.1.0"}
+                            {:on io.aviso/pretty, :version "1.1"}
+                            {:on org.slf4j/jcl-over-slf4j, :version "1.7.30"}]}
+            {:id io.aviso/pretty, :version "1.1.1", :dependencies [{:on org.clojure/clojure, :version "1.7.0"}]}
+            {:id io.github.hlship/cli-tools,
+             :version "0.5",
+             :dependencies [{:on org.clojure/clojure, :version "1.10.3"}
+                            {:on org.clojure/tools.cli, :version "1.0.206"}
+                            {:on io.aviso/pretty, :version "1.1.1"}
+                            {:on clj-fuzzy/clj-fuzzy, :version "0.4.1"}]}
+            {:id io.netty/netty-buffer,
+             :version "4.1.73.Final",
+             :dependencies [{:on io.netty/netty-common, :version "4.1.73.Final"}]}
+            {:id io.netty/netty-codec,
+             :version "4.1.73.Final",
+             :dependencies [{:on io.netty/netty-common, :version "4.1.73.Final"}
+                            {:on io.netty/netty-buffer, :version "4.1.73.Final"}
+                            {:on io.netty/netty-transport, :version "4.1.73.Final"}]}
+            {:id io.netty/netty-codec-http,
+             :version "4.1.73.Final",
+             :dependencies [{:on io.netty/netty-common, :version "4.1.73.Final"}
+                            {:on io.netty/netty-buffer, :version "4.1.73.Final"}
+                            {:on io.netty/netty-transport, :version "4.1.73.Final"}
+                            {:on io.netty/netty-codec, :version "4.1.73.Final"}
+                            {:on io.netty/netty-handler, :version "4.1.73.Final"}]}
+            {:id io.netty/netty-codec-socks,
+             :version "4.1.73.Final",
+             :dependencies [{:on io.netty/netty-common, :version "4.1.73.Final"}
+                            {:on io.netty/netty-buffer, :version "4.1.73.Final"}
+                            {:on io.netty/netty-transport, :version "4.1.73.Final"}
+                            {:on io.netty/netty-codec, :version "4.1.73.Final"}]}
+            {:id io.netty/netty-common, :version "4.1.73.Final"}
+            {:id io.netty/netty-handler,
+             :version "4.1.73.Final",
+             :dependencies [{:on io.netty/netty-common, :version "4.1.73.Final"}
+                            {:on io.netty/netty-resolver, :version "4.1.73.Final"}
+                            {:on io.netty/netty-buffer, :version "4.1.73.Final"}
+                            {:on io.netty/netty-transport, :version "4.1.73.Final"}
+                            {:on io.netty/netty-codec, :version "4.1.73.Final"}
+                            {:on io.netty/netty-tcnative-classes, :version "2.0.46.Final"}]}
+            {:id io.netty/netty-handler-proxy,
+             :version "4.1.73.Final",
+             :dependencies [{:on io.netty/netty-common, :version "4.1.73.Final"}
+                            {:on io.netty/netty-buffer, :version "4.1.73.Final"}
+                            {:on io.netty/netty-transport, :version "4.1.73.Final"}
+                            {:on io.netty/netty-codec, :version "4.1.73.Final"}
+                            {:on io.netty/netty-codec-socks, :version "4.1.73.Final"}
+                            {:on io.netty/netty-codec-http, :version "4.1.73.Final"}]}
+            {:id io.netty/netty-resolver,
+             :version "4.1.73.Final",
+             :dependencies [{:on io.netty/netty-common, :version "4.1.73.Final"}]}
+            {:id io.netty/netty-tcnative-classes, :version "2.0.46.Final"}
+            {:id io.netty/netty-transport,
+             :version "4.1.73.Final",
+             :dependencies [{:on io.netty/netty-common, :version "4.1.73.Final"}
+                            {:on io.netty/netty-buffer, :version "4.1.73.Final"}
+                            {:on io.netty/netty-resolver, :version "4.1.73.Final"}]}
+            {:id io.netty/netty-transport-classes-epoll,
+             :version "4.1.73.Final",
+             :dependencies [{:on io.netty/netty-common, :version "4.1.73.Final"}
+                            {:on io.netty/netty-buffer, :version "4.1.73.Final"}
+                            {:on io.netty/netty-transport, :version "4.1.73.Final"}
+                            {:on io.netty/netty-transport-native-unix-common, :version "4.1.73.Final"}]}
+            {:id io.netty/netty-transport-classes-kqueue,
+             :version "4.1.73.Final",
+             :dependencies [{:on io.netty/netty-common, :version "4.1.73.Final"}
+                            {:on io.netty/netty-buffer, :version "4.1.73.Final"}
+                            {:on io.netty/netty-transport, :version "4.1.73.Final"}
+                            {:on io.netty/netty-transport-native-unix-common, :version "4.1.73.Final"}]}
+            {:id io.netty/netty-transport-native-epoll$linux-x86_64,
+             :version "4.1.73.Final",
+             :dependencies [{:on io.netty/netty-common, :version "4.1.73.Final"}
+                            {:on io.netty/netty-buffer, :version "4.1.73.Final"}
+                            {:on io.netty/netty-transport, :version "4.1.73.Final"}
+                            {:on io.netty/netty-transport-native-unix-common, :version "4.1.73.Final"}
+                            {:on io.netty/netty-transport-classes-epoll, :version "4.1.73.Final"}]}
+            {:id io.netty/netty-transport-native-kqueue$osx-x86_64,
+             :version "4.1.73.Final",
+             :dependencies [{:on io.netty/netty-common, :version "4.1.73.Final"}
+                            {:on io.netty/netty-buffer, :version "4.1.73.Final"}
+                            {:on io.netty/netty-transport, :version "4.1.73.Final"}
+                            {:on io.netty/netty-transport-native-unix-common, :version "4.1.73.Final"}
+                            {:on io.netty/netty-transport-classes-kqueue, :version "4.1.73.Final"}]}
+            {:id io.netty/netty-transport-native-unix-common,
+             :version "4.1.73.Final",
+             :dependencies [{:on io.netty/netty-common, :version "4.1.73.Final"}
+                            {:on io.netty/netty-buffer, :version "4.1.73.Final"}
+                            {:on io.netty/netty-transport, :version "4.1.73.Final"}]}
+            {:id jakarta.json/jakarta.json-api, :version "1.1.6"}
+            {:id org.apache.activemq/artemis-commons,
+             :version "2.19.1",
+             :dependencies [{:on org.jboss.logging/jboss-logging, :version "3.4.2.Final"}
+                            {:on io.netty/netty-buffer, :version "4.1.73.Final"}
+                            {:on io.netty/netty-transport, :version "4.1.73.Final"}
+                            {:on io.netty/netty-handler, :version "4.1.73.Final"}
+                            {:on commons-beanutils/commons-beanutils, :version "1.9.4"}
+                            {:on jakarta.json/jakarta.json-api, :version "1.1.6"}]}
+            {:id org.apache.activemq/artemis-core-client,
+             :version "2.19.1",
+             :dependencies [{:on io.netty/netty-common, :version "4.1.73.Final"}
+                            {:on io.netty/netty-transport-native-kqueue$osx-x86_64, :version "4.1.73.Final"}
+                            {:on io.netty/netty-handler-proxy, :version "4.1.73.Final"}
+                            {:on io.netty/netty-codec, :version "4.1.73.Final"}
+                            {:on io.netty/netty-codec-socks, :version "4.1.73.Final"}
+                            {:on org.apache.johnzon/johnzon-core, :version "0.9.5"}
+                            {:on org.apache.activemq/artemis-commons, :version "2.19.1"}
+                            {:on io.netty/netty-buffer, :version "4.1.73.Final"}
+                            {:on io.netty/netty-handler, :version "4.1.73.Final"}
+                            {:on jakarta.json/jakarta.json-api, :version "1.1.6"}
+                            {:on io.netty/netty-transport-native-epoll$linux-x86_64, :version "4.1.73.Final"}
+                            {:on io.netty/netty-transport, :version "4.1.73.Final"}
+                            {:on io.netty/netty-codec-http, :version "4.1.73.Final"}]}
+            {:id org.apache.httpcomponents/httpclient,
+             :version "4.5.9",
+             :dependencies [{:on org.apache.httpcomponents/httpcore, :version "4.4.11"}
+                            {:on commons-codec/commons-codec, :version "1.11"}]}
+            {:id org.apache.httpcomponents/httpcore, :version "4.4.11"}
+            {:id org.apache.johnzon/johnzon-core, :version "0.9.5"}
+            {:id org.apache.tomcat/tomcat-jdbc,
+             :version "7.0.109",
+             :dependencies [{:on org.apache.tomcat/tomcat-juli, :version "7.0.109"}]}
+            {:id org.apache.tomcat/tomcat-juli, :version "7.0.109"}
+            {:id org.checkerframework/checker-qual, :version "3.1.0"}
+            {:id org.clojure/clojure,
+             :version "1.11.1",
+             :dependencies [{:on org.clojure/spec.alpha, :version "0.3.218"}
+                            {:on org.clojure/core.specs.alpha, :version "0.2.62"}]}
+            {:id org.clojure/core.specs.alpha, :version "0.2.62"}
+            {:id org.clojure/data.fressian,
+             :version "1.0.0",
+             :dependencies [{:on org.clojure/clojure, :version "1.7.0"} {:on org.fressian/fressian, :version "0.6.6"}]}
+            {:id org.clojure/java.jmx, :version "1.0.0", :dependencies [{:on org.clojure/clojure, :version "1.4.0"}]}
+            {:id org.clojure/spec.alpha, :version "0.3.218"}
+            {:id org.clojure/tools.cli, :version "1.0.206"}
+            {:id org.clojure/tools.logging, :version "1.1.0", :dependencies [{:on org.clojure/clojure, :version "1.4.0"}]}
+            {:id org.codehaus.janino/commons-compiler, :version "3.0.12"}
+            {:id org.codehaus.janino/commons-compiler-jdk,
+             :version "3.0.12",
+             :dependencies [{:on org.codehaus.janino/commons-compiler, :version "3.0.12"}]}
+            {:id org.fressian/fressian, :version "0.6.6"}
+            {:id org.hdrhistogram/HdrHistogram, :version "2.1.12"}
+            {:id org.jboss.logging/jboss-logging, :version "3.4.2.Final"}
+            {:id org.slf4j/jcl-over-slf4j, :version "1.7.36", :dependencies [{:on org.slf4j/slf4j-api, :version "1.7.36"}]}
+            {:id org.slf4j/jul-to-slf4j, :version "1.7.36", :dependencies [{:on org.slf4j/slf4j-api, :version "1.7.36"}]}
+            {:id org.slf4j/log4j-over-slf4j,
+             :version "1.7.36",
+             :dependencies [{:on org.slf4j/slf4j-api, :version "1.7.36"}]}
+            {:id org.slf4j/slf4j-api, :version "1.7.36"}],
+    :root-node-id example/proj})
+
 (defn init
   []
-  (rf/dispatch [::set-input-model placeholder-input-model]))
+  (rf/dispatch [::set-input-model (parse-sample)]))
