@@ -102,6 +102,11 @@
                 (assoc db ::input-model input-model
                           ::focus-node-id (-> input-model :root-node-id str))))
 
+;; Triggered by clicking on a node
+(reg-event-db ::select-focus-node
+              (fn [db [_ node-id]]
+                (assoc db ::focus-node-id node-id)))
+
 ;; Just putting a key into the app db doesn't trigger anything; instead register a sub that extracts the
 ;; data (with an engineered coincidence).
 (reg-sub ::input-model
@@ -121,6 +126,7 @@
          :<- [::focus-node-id]
          ;; Gets a single argument, no event
          :-> (fn [[view-nodes focus-node-id]]
+               (prn ::focus-node)
                (get view-nodes focus-node-id)))
 
 (reg-sub ::dependents
@@ -170,11 +176,13 @@
   []
   (let [nodes (<sub [::view-ready-nodes])
         edges (<sub [::edges])]
-    (when nodes
-      [:div.app-flow-container
-       ;; :> converts the top level map to a JS map, but doesn't do so recursively.
+    [:div.app-flow-container
+     ;; :> converts the top level map to a JS map, but doesn't do so recursively.
+     (when nodes
        [:> ReactFlow {:nodes (clj->js nodes)
-                      :edges (clj->js edges)}]])))
+                      :edges (clj->js edges)
+                      :onNodeClick (fn [_event node]
+                                     (rf/dispatch [::select-focus-node (.-id node)]))}])]))
 
 (defn flow-panel
   []
