@@ -38,12 +38,13 @@
                     :let [on-id' (str on-id)]]
                 {:id (str id' "->" on-id')
                  :source id'
-                 :target on-id'
-                 :sourcePosition "right"})]
+                 :target on-id'})]
     {:id id'
      :type "default"                                        ; can have inputs and outputs
      :data {:label (str id' " " version)}
      :edges edges
+     :targetPosition "left"
+     :sourcePosition "right"
      :dependencies (->> edges
                         (map :target)
                         set)}))
@@ -81,46 +82,19 @@
 
 
 (def ^:const node-width 160)
+(def ^:const node-height 50)
 
-(defn layout-row
-  [y nodes]
+(defn layout-column
+  [x nodes]
   ;; TODO: Spread them out evenly across the row, maybe with a kind of arc shape
   ;; TODO: Deal with too many to fit with buttons to scroll the list.
   (let [n (count nodes)
-        ;; TODO: Get the actual width of the flow and center based on that
-        x-base (- (/ 1300 2)
-                  (/ (* node-width n) 2))]
+        y-base (- (/ 600 2)
+                  (/ (* node-height n) 2))]
     (map-indexed (fn [i node]
-                   (assoc node :position {:x (+ x-base (* node-width i))
-                                          :y y}))
+                   (assoc node :position {:x x
+                                          :y (+ y-base (* node-height i))}))
                  nodes)))
-
-(defn layout-nodes+edges
-  [view-nodes focus-node-id]
-  (let [id->node (medley/index-by :id view-nodes)
-        focus-node (get id->node focus-node-id)
-        ;; Left column: nodes that depend on the focus node
-        dependants (->> view-nodes
-                        (filter #(contains? (:dependencies %) focus-node-id))
-                        (sort-by :id)
-                        (layout-row 50))
-        ;; Right column: dependencies of the focus node
-        dependencies (->> (map #(get id->node %) (:dependencies focus-node))
-                          (sort-by :id)
-                          (layout-row 300))
-        all-nodes (concat (layout-row 200 [focus-node])
-                          dependants
-                          dependencies)
-        relevant-ids (->> all-nodes
-                          (map :id)
-                          set)
-        relevant-edge? (fn [{:keys [source target]}]
-                         (and (contains? relevant-ids source)
-                              (contains? relevant-ids target)))
-        edges (->> all-nodes
-                   (mapcat :edges)
-                   (filter relevant-edge?))]
-    [all-nodes edges]))
 
 (reg-event-db ::set-input-model
               [rf/unwrap]
@@ -129,7 +103,7 @@
                           ::focus-node-id (-> input-model :root-node-id str))))
 
 ;; Just putting a key into the app db doesn't trigger anything; instead register a sub that extracts the
-;; data (with an engineered coincidence.
+;; data (with an engineered coincidence).
 (reg-sub ::input-model
          :-> ::input-model)
 
@@ -170,11 +144,11 @@
          (fn [[dependents focus-node dependencies]]
            (let [dependents' (->> dependents
                                   (sort-by :id)
-                                  (layout-row 50))
+                                  (layout-column 100))
                  dependencies' (->> dependencies
                                     (sort-by :id)
-                                    (layout-row 300))
-                 focus-node' (layout-row 200 [focus-node])]
+                                    (layout-column 1000))
+                 focus-node' (layout-column 600 [focus-node])]
              (-> dependents'
                  (into dependencies')
                  (into focus-node')))))
