@@ -102,6 +102,14 @@
               (fn [db [_ node-id]]
                 (assoc db ::focus-node-id node-id)))
 
+;; The active edge is the one the mouse is over
+(reg-event-db ::set-active-edge-id
+              (fn [db [_ edge-id]]
+                (assoc db ::active-edge-id edge-id)))
+
+(reg-sub ::active-edge-id
+         :-> ::active-edge-id)
+
 ;; Just putting a key into the app db doesn't trigger anything; instead register a sub that extracts the
 ;; data (with an engineered coincidence).
 (reg-sub ::input-model
@@ -139,43 +147,99 @@
          :<- [::dependents]
          :<- [::focus-node]
          :<- [::dependencies]
-         (fn [[dependents focus-node dependencies]]
+         :<- [::active-edge-node-ids]
+         (fn [[dependents focus-node dependencies active-node-ids]]
            (let [dependents' (->> dependents
                                   (sort-by :id)
                                   (layout-column 100))
                  dependencies' (->> dependencies
                                     (sort-by :id)
                                     (layout-column 1000))
-                 focus-node' (layout-column 600 [focus-node])]
-             (-> dependents'
-                 (into dependencies')
-                 (into focus-node')))))
+                 focus-node' (layout-column 600 [focus-node])
+                 all-nodes (-> dependents'
+                               (into dependencies')
+                               (into focus-node'))
+                 f (fn [{:keys [id] :as node}]
+                     (if (contains? active-node-ids id)
+                       (assoc node :className "active")
+                       node))]
+             (map f all-nodes))))
 
+;; ::edges is a map of edges ready to be drawn on screen, keyed by edge id.
 (reg-sub ::edges
-         :<- [::view-ready-nodes]
-         :-> (fn [nodes]
+         :<- [::dependents]
+         :<- [::focus-node]
+         :<- [::dependencies]
+         :-> (fn [[dependents focus-node dependencies]]
                ;; Only edges where both sides of the connection are "on screen" should be
                ;; included.
-               (let [relevant-ids (->> nodes (map :id) set)
+               (let [nodes (-> dependents
+                               (into dependencies)
+                               (conj focus-node))
+                     relevant-ids (->> nodes (map :id) set)
                      relevant-edge? (fn [{:keys [source target]}]
                                       (and (contains? relevant-ids source)
                                            (contains? relevant-ids target)))]
                  (->> nodes
                       (mapcat :edges)
-                      (filter relevant-edge?)))))
+                      (filter relevant-edge?)
+                      (medley/index-by :id)))))
+
+;; A set of ids of the two nodes on either side of the active edge.
+(reg-sub ::active-edge-node-ids
+         :<- [::edges]
+         :<- [::active-edge-id]
+         :-> (fn [[edges active-edge-id]]
+               (when-let [edge (get edges active-edge-id)]
+                 (set [(:source edge)
+                       (:target edge)]))))
+
+(defn- make-edge-view-ready
+  [{:keys [id] :as edge} active-edge-id]
+  (if (= id active-edge-id)
+    (assoc edge :selected true
+                :zIndex 1000
+                :markerEnd {:type :arrowclosed
+                            ;; Slightly ugly but gets the job done. Would rather find a way to
+                            ;; do this in CSS.
+                            :color :black})
+    edge))
+
+(reg-sub ::view-ready-edges
+         :<- [::edges]
+         :<- [::active-edge-id]
+         :-> (fn [[edges-map active-edge-id]]
+               (->> edges-map
+                    vals
+                    (map #(make-edge-view-ready % active-edge-id)))))
+
+(defn active-edge-details
+  []
+  (let [active-edge-id (<sub [::active-edge-id])
+        edges (<sub [::edges])
+        edge (get edges active-edge-id)]
+    (when-let [{:keys [source target]} edge]
+      [:div
+       (str (name source) " -> " (name target))])))
 
 (defn flow-panel
   []
   (let [nodes (<sub [::view-ready-nodes])
-        edges (<sub [::edges])]
+        edges (<sub [::view-ready-edges])]
     [:div.app-flow-container
      ;; :> converts the top level map to a JS map, but doesn't do so recursively.
      (when (seq nodes)
        [:> ReactFlow {:nodes (clj->js nodes)
                       :edges (clj->js edges)
+                      :nodesConnectable false
+                      :onEdgeMouseEnter (fn [_event edge]
+                                          (rf/dispatch [::set-active-edge-id (.-id edge)]))
+                      :onEdgeMouseLeave (fn [_event _edge]
+                                          (rf/dispatch [::set-active-edge-id nil]))
                       :onNodeClick (fn [_event node]
                                      (rf/dispatch [::select-focus-node (.-id node)]))}
-        [:> rfr/Controls {:showInteractive false}]])]))
+        [:> rfr/Controls {:showInteractive false}]])
+     [active-edge-details]]))
 
 (defn- parse-sample
   []

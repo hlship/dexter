@@ -3,3 +3,16 @@ div.app-flow-container {
     width: 100%;
     height: 600px;
 }
+
+path.react-flow__edge-path {
+    stroke-width: 3px;
+}
+
+g.react-flow__edge.selected path {
+    stroke: black;
+}
+
+div.react-flow__node.active {
+  color: white;
+  background: black;
+}
