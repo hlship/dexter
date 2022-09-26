@@ -174,7 +174,8 @@
        [:> ReactFlow {:nodes (clj->js nodes)
                       :edges (clj->js edges)
                       :onNodeClick (fn [_event node]
-                                     (rf/dispatch [::select-focus-node (.-id node)]))}])]))
+                                     (rf/dispatch [::select-focus-node (.-id node)]))}
+        [:> rfr/Controls {:showInteractive false}]])]))
 
 (defn- parse-sample
   []
