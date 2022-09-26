@@ -33,15 +33,18 @@
   [node]
   (let [{:keys [id version dependencies]} node
         id' (str id)
-        edges (for [{target-id :id} dependencies
+        edges (for [{target-id :id
+                     target-version :version} dependencies
                     :let [target-id' (str target-id)]]
                 {:id (str id' "->" target-id')
                  :source id'
                  :target target-id'
+                 :requested-version target-version
                  :markerEnd {:type "arrowclosed"}})]
     {:id id'
      :data {:label (str id' " " version)}
      :edges edges
+     :version version
      :targetPosition :left
      :sourcePosition :right
      :dependencies (->> edges
@@ -97,18 +100,32 @@
                 (assoc db ::input-model input-model
                           ::focus-node-id (-> input-model :root-node-id str))))
 
+(defn- simple-event-db
+  [k]
+  (fn [db [_ v]]
+    (assoc db k v)))
+
 ;; Triggered by clicking on a node
 (reg-event-db ::select-focus-node
-              (fn [db [_ node-id]]
-                (assoc db ::focus-node-id node-id)))
+              (simple-event-db ::focus-node-id))
 
 ;; The active edge is the one the mouse is over
 (reg-event-db ::set-active-edge-id
-              (fn [db [_ edge-id]]
-                (assoc db ::active-edge-id edge-id)))
+              (simple-event-db ::active-edge-id))
+
+(reg-sub ::root-node-id
+         :<- [::input-model]
+         :-> #(-> % :root-node-id str))
 
 (reg-sub ::active-edge-id
          :-> ::active-edge-id)
+
+(reg-event-db ::set-hide-clojure
+              (simple-event-db ::hide-clojure))
+
+(reg-sub ::hide-clojure
+         :-> (fn [db]
+               (get db ::hide-clojure true)))
 
 ;; Just putting a key into the app db doesn't trigger anything; instead register a sub that extracts the
 ;; data (with an engineered coincidence).
@@ -170,7 +187,9 @@
          :<- [::dependents]
          :<- [::focus-node]
          :<- [::dependencies]
-         :-> (fn [[dependents focus-node dependencies]]
+         :<- [::hide-clojure]
+         :<- [::root-node-id]
+         :-> (fn [[dependents focus-node dependencies hide-clojure root-node-id]]
                ;; Only edges where both sides of the connection are "on screen" should be
                ;; included.
                (let [nodes (-> dependents
@@ -183,6 +202,12 @@
                  (->> nodes
                       (mapcat :edges)
                       (filter relevant-edge?)
+                      ;; The dependencies on Clojure can be noisy; by default, remove edges
+                      ;; to clojure, except for the root node.
+                      (remove (fn [edge]
+                                (and hide-clojure
+                                     (not= (:source edge) root-node-id)
+                                     (= (:target edge) "org.clojure/clojure"))))
                       (medley/index-by :id)))))
 
 ;; A set of ids of the two nodes on either side of the active edge.
@@ -195,23 +220,37 @@
                        (:target edge)]))))
 
 (defn- make-edge-view-ready
-  [{:keys [id] :as edge} active-edge-id]
-  (if (= id active-edge-id)
-    (assoc edge :selected true
-                :zIndex 1000
-                :markerEnd {:type :arrowclosed
-                            ;; Slightly ugly but gets the job done. Would rather find a way to
-                            ;; do this in CSS.
-                            :color :black})
-    edge))
+  [view-nodes {:keys [id requested-version target] :as edge} active-edge-id]
+  (let [version-mismatch (not= requested-version
+                               (get-in view-nodes [target :version]))]
+    (cond
+      (= id active-edge-id)
+      (assoc edge :selected true
+                  :zIndex 1000
+                  :label (when version-mismatch
+                           requested-version)
+                  :markerEnd {:type :arrowclosed
+                              ;; Slightly ugly but gets the job done. Would rather find a way to
+                              ;; do this in CSS.
+                              :color :black})
+
+      version-mismatch
+      (assoc edge :className "version-mismatch"
+                  :label requested-version
+                  :markerEnd {:type :arrowclosed
+                              :color :red})
+
+      :else
+      edge)))
 
 (reg-sub ::view-ready-edges
+         :<- [::view-nodes]
          :<- [::edges]
          :<- [::active-edge-id]
-         :-> (fn [[edges-map active-edge-id]]
+         :-> (fn [[view-nodes edges-map active-edge-id]]
                (->> edges-map
                     vals
-                    (map #(make-edge-view-ready % active-edge-id)))))
+                    (map #(make-edge-view-ready view-nodes % active-edge-id)))))
 
 (defn active-edge-details
   []
@@ -222,24 +261,38 @@
       [:div
        (str (name source) " -> " (name target))])))
 
+(defn hide-show-clojure-button
+  []
+  (let [hide-clojure (<sub [::hide-clojure])]
+    [:label
+     [:input {:type :checkbox
+              :checked hide-clojure
+              :name :hide-clojure
+              :on-click (fn [event _]
+                           (.preventDefault event)
+                          (rf/dispatch [::set-hide-clojure (not hide-clojure)]))}]
+     "Hide Clojure Dependencies"]))
+
 (defn flow-panel
   []
   (let [nodes (<sub [::view-ready-nodes])
         edges (<sub [::view-ready-edges])]
-    [:div.app-flow-container
-     ;; :> converts the top level map to a JS map, but doesn't do so recursively.
-     (when (seq nodes)
-       [:> ReactFlow {:nodes (clj->js nodes)
-                      :edges (clj->js edges)
-                      :nodesConnectable false
-                      :onEdgeMouseEnter (fn [_event edge]
-                                          (rf/dispatch [::set-active-edge-id (.-id edge)]))
-                      :onEdgeMouseLeave (fn [_event _edge]
-                                          (rf/dispatch [::set-active-edge-id nil]))
-                      :onNodeClick (fn [_event node]
-                                     (rf/dispatch [::select-focus-node (.-id node)]))}
-        [:> rfr/Controls {:showInteractive false}]])
-     [active-edge-details]]))
+    [:<>
+     [hide-show-clojure-button]
+     [:div.app-flow-container
+      ;; :> converts the top level map to a JS map, but doesn't do so recursively.
+      (when (seq nodes)
+        [:> ReactFlow {:nodes (clj->js nodes)
+                       :edges (clj->js edges)
+                       :nodesConnectable false
+                       :onEdgeMouseEnter (fn [_event edge]
+                                           (rf/dispatch [::set-active-edge-id (.-id edge)]))
+                       :onEdgeMouseLeave (fn [_event _edge]
+                                           (rf/dispatch [::set-active-edge-id nil]))
+                       :onNodeClick (fn [_event node]
+                                      (rf/dispatch [::select-focus-node (.-id node)]))}
+         [:> rfr/Controls {:showInteractive false}]])
+      [active-edge-details]]]))
 
 (defn- parse-sample
   []

@@ -12,6 +12,10 @@ g.react-flow__edge.selected path {
     stroke: black;
 }
 
+g.react-flow__edge.version-mismatch path {
+    stroke: red;
+}
+
 div.react-flow__node.active {
   color: white;
   background: black;
