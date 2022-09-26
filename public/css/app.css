@@ -12,8 +12,12 @@ g.react-flow__edge.selected path {
     stroke: black;
 }
 
-g.react-flow__edge.version-mismatch path {
+g.react-flow__edge.incompatible-version path {
     stroke: red;
+}
+
+g.react-flow__edge.compatible-version path {
+    stroke: blue;
 }
 
 div.react-flow__node.active {

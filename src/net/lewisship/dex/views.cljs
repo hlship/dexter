@@ -2,6 +2,7 @@
   (:require
     ["react" :as react]
     ["react-flow-renderer" :as rfr :default ReactFlow]
+    ["semver" :as semver]
     [re-frame.core :as rf :refer [reg-sub reg-event-db]]
     [clojure.spec.alpha :as s]
     [medley.core :as medley]
@@ -221,24 +222,26 @@
 
 (defn- make-edge-view-ready
   [view-nodes {:keys [id requested-version target] :as edge} active-edge-id]
-  (let [version-mismatch (not= requested-version
-                               (get-in view-nodes [target :version]))]
+  (let [target-version (get-in view-nodes [target :version])
+        version-mismatch? (not= requested-version
+                               target-version)
+        compatible? (semver/satisfies target-version (str "~" requested-version))]
     (cond
       (= id active-edge-id)
       (assoc edge :selected true
                   :zIndex 1000
-                  :label (when version-mismatch
+                  :label (when version-mismatch?
                            requested-version)
                   :markerEnd {:type :arrowclosed
                               ;; Slightly ugly but gets the job done. Would rather find a way to
                               ;; do this in CSS.
                               :color :black})
 
-      version-mismatch
-      (assoc edge :className "version-mismatch"
+      version-mismatch?
+      (assoc edge :className (if compatible? "compatible-version" "incompatible-version")
                   :label requested-version
                   :markerEnd {:type :arrowclosed
-                              :color :red})
+                              :color (if compatible? :blue :red)})
 
       :else
       edge)))
