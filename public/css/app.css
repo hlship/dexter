@@ -24,3 +24,13 @@ div.react-flow__node.active {
   color: white;
   background: black;
 }
+
+span.compatible-version {
+    color: blue;
+    font-weight: bold;
+}
+
+span.incompatible-version {
+  color:red;
+  font-weight: bold;
+}

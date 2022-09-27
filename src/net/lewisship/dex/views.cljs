@@ -183,24 +183,50 @@
                        node))]
              (map f all-nodes))))
 
-;; ::edges is a map of edges ready to be drawn on screen, keyed by edge id.
-(reg-sub ::edges
+;; The focus node and its dependencies and dependents, as a map. This defines what's "visible" on the screen,
+;; at least until we implement the shelf and/or animations.
+(reg-sub ::visible-nodes
          :<- [::dependents]
          :<- [::focus-node]
          :<- [::dependencies]
+         :-> (fn [[dependents focus-node dependencies]]
+               (medley/index-by :id
+                                (-> [focus-node]
+                                    (into dependencies)
+                                    (into dependents)))))
+
+(defn- record-version-compatibility
+  [visible-nodes edge]
+  (let [{:keys [requested-version target]} edge
+        target-version (get-in visible-nodes [target :version])
+        version-mismatch? (not= requested-version
+                                target-version)
+        ;; This check is not working quite right, at least for x.y versions (it seems to work for x.y.z).
+        compatible? (when version-mismatch?
+                      (semver/satisfies target-version (str "^" requested-version)))]
+    (cond
+      compatible?
+      (assoc edge :version-compatibility :compatible)
+
+      version-mismatch?
+      (assoc edge :version-compatibility :incompatible)
+
+      :else edge)))
+
+;; ::edges is a map of edges ready to be drawn on screen, keyed by edge id.
+(reg-sub ::edges
+         :<- [::visible-nodes]
          :<- [::hide-clojure]
          :<- [::root-node-id]
-         :-> (fn [[dependents focus-node dependencies hide-clojure root-node-id]]
+         :-> (fn [[visible-nodes hide-clojure root-node-id]]
                ;; Only edges where both sides of the connection are "on screen" should be
                ;; included.
-               (let [nodes (-> dependents
-                               (into dependencies)
-                               (conj focus-node))
-                     relevant-ids (->> nodes (map :id) set)
+               (let [relevant-ids (-> visible-nodes keys set)
                      relevant-edge? (fn [{:keys [source target]}]
                                       (and (contains? relevant-ids source)
                                            (contains? relevant-ids target)))]
-                 (->> nodes
+                 (->> visible-nodes
+                      vals
                       (mapcat :edges)
                       (filter relevant-edge?)
                       ;; The dependencies on Clojure can be noisy; by default, remove edges
@@ -209,6 +235,7 @@
                                 (and hide-clojure
                                      (not= (:source edge) root-node-id)
                                      (= (:target edge) "org.clojure/clojure"))))
+                      (map #(record-version-compatibility visible-nodes %))
                       (medley/index-by :id)))))
 
 ;; A set of ids of the two nodes on either side of the active edge.
@@ -217,15 +244,13 @@
          :<- [::active-edge-id]
          :-> (fn [[edges active-edge-id]]
                (when-let [edge (get edges active-edge-id)]
-                 (set [(:source edge)
-                       (:target edge)]))))
+                 #{(:source edge)
+                   (:target edge)})))
 
 (defn- make-edge-view-ready
-  [view-nodes {:keys [id requested-version target] :as edge} active-edge-id]
-  (let [target-version (get-in view-nodes [target :version])
-        version-mismatch? (not= requested-version
-                               target-version)
-        compatible? (semver/satisfies target-version (str "~" requested-version))]
+  [{:keys [id requested-version version-compatibility] :as edge} active-edge-id]
+  (let [version-mismatch? (some? version-compatibility)
+        compatible? (= :compatible version-compatibility)]
     (cond
       (= id active-edge-id)
       (assoc edge :selected true
@@ -247,22 +272,36 @@
       edge)))
 
 (reg-sub ::view-ready-edges
-         :<- [::view-nodes]
          :<- [::edges]
          :<- [::active-edge-id]
-         :-> (fn [[view-nodes edges-map active-edge-id]]
+         :-> (fn [[edges-map active-edge-id]]
                (->> edges-map
                     vals
-                    (map #(make-edge-view-ready view-nodes % active-edge-id)))))
+                    (map #(make-edge-view-ready % active-edge-id)))))
 
 (defn active-edge-details
   []
-  (let [active-edge-id (<sub [::active-edge-id])
+  (let [visible-nodes (<sub [::visible-nodes])
+        active-edge-id (<sub [::active-edge-id])
         edges (<sub [::edges])
-        edge (get edges active-edge-id)]
-    (when-let [{:keys [source target]} edge]
+        edge (get edges active-edge-id)
+        {:keys [source target requested-version  version-compatibility]} edge
+         target-version (get-in visible-nodes [target :version])
+         ]
+    (when edge
       [:div
-       (str (name source) " -> " (name target))])))
+       source
+       " -> "
+       target
+       " "
+       (when (some? version-compatibility)
+         [:<>
+          [:span {:class (if (= version-compatibility :compatible)
+                           :compatible-version
+                           :incompatible-version)}
+           requested-version]
+          " / "])
+       target-version])))
 
 (defn hide-show-clojure-button
   []
