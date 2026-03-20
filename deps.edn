@@ -1,0 +1,14 @@
+{:paths ["src"
+         "generated-resources"
+         "resources"]
+ :deps
+ {org.clojure/clojure                          {:mvn/version "1.12.4"}
+  dynamic-alpha/hyper                          {:git/url "https://github.com/dynamic-alpha/hyper"
+                                                :git/sha "cbd8e757a3c96eb1e080b38c108514bac8357da6"}
+  com.aayushatharva.brotli4j/native-osx-x86_64 {:mvn/version "1.18.0"}}
+
+ :aliases
+ {:dev {:extra-paths ["dev"
+                      "dev-resources"]
+        :extra-deps  {io.github.hlship/trace      {:mvn/version "1.4"}
+                      io.github.tonsky/clj-reload {:mvn/version "1.0.0"}}}}}

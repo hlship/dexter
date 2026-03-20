@@ -1,0 +1,4 @@
+{:tasks
+ {:requires [[babashka.process :as p]]
+  test      (p/shell "clojure -M:test")
+  tailwind  (p/shell "tailwindcss -i public/style.css -o generated-resources/public/style.css --watch")}}
