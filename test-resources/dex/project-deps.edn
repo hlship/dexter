@@ -1,0 +1,11 @@
+{org.clojure/clojure               {:version "1.12.4"
+                                    :deps    {org.clojure/spec.alpha       {:version "0.5.238"}
+                                              org.clojure.core.specs.alpha {:version "0.4.74"}}}
+ ROOT                              {:version "0.0.0"
+                                    :label   "org.clj-commons/humanize"
+                                    :deps    {org.clojure/clojure               {:version "1.12.4"}
+                                              com.widdindustries/cljc.java-time {:version "0.1.21"}}}
+ com.widdindustries/cljs.java-time {:version "0.1.20"}
+ com.widdindustries/cljc.java-time {:version "0.1.21"
+                                    :deps    {com.widdindustries/cljs.java-time {:version "0.1.20"}}}
+ }
