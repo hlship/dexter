@@ -161,9 +161,10 @@
   (let [db @deps/*db
         cursor (h/tab-cursor :view {:selected 'ROOT
                                     :left-offset 0
-                                    :right-offset 0})
-        {:keys [selected left-offset right-offset]} @cursor
-        layout-data (layout/compute-layout db selected left-offset right-offset)
+                                    :right-offset 0
+                                    :hidden-libs layout/default-hidden-libs})
+        {:keys [selected left-offset right-offset hidden-libs]} @cursor
+        layout-data (layout/compute-layout db selected left-offset right-offset hidden-libs)
         max-col-count (max 1
                            (count (get-in layout-data [:left :boxes]))
                            (count (get-in layout-data [:right :boxes])))
@@ -236,7 +237,7 @@
   (require '[net.lewisship.dex.deps-reader :as deps-reader])
   (let [raw-data (deps-reader/read-deps "deps.edn" {:aliases [:dev :test]})]
     (reset! deps/*db (deps/build-db raw-data)))
-  
+
   (start!)
 
   (stop!)

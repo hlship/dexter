@@ -12,6 +12,11 @@
 ;; Maximum number of nodes visible in a single column before windowing kicks in.
 (def ^:const max-visible 8)
 
+(def default-hidden-libs
+  "Default set of libs to hide from dependency/dependant columns.
+  These are ubiquitous dependencies that add clutter without insight."
+  #{'org.clojure/clojure})
+
 (defn- window-items
   "Applies windowing to a collection of items.
 
@@ -86,22 +91,29 @@
   - selected       - the currently selected artifact key
   - left-offset    - windowing offset for the dependants column
   - right-offset   - windowing offset for the dependencies column
+  - hidden-libs    - set of lib keys to hide from dependency/dependant columns
+                     (unless the hidden lib itself is selected)
 
   Returns a map with:
   - :selected-box   - the center box descriptor
   - :left           - windowed dependants column {:items :boxes :total :offset :before :after}
   - :right          - windowed dependencies column {:items :boxes :total :offset :before :after}
   - :connections    - vector of connection records between visible artifacts"
-  [db selected left-offset right-offset]
+  [db selected left-offset right-offset hidden-libs]
   (let [;; Center box
         selected-box (artifact-box db selected :center 0)
+
+        ;; Hidden libs are filtered out of columns unless they are the selected artifact
+        hide? (fn [k] (and (seq hidden-libs)
+                           (contains? hidden-libs k)
+                           (not= k selected)))
 
         ;; Build full lists of dependency/dependant keys
         dep-connections (deps/dependencies db selected)
         dept-connections (deps/dependants db selected)
 
-        dep-keys (mapv :to dep-connections)
-        dept-keys (mapv :from dept-connections)
+        dep-keys (into [] (remove hide?) (mapv :to dep-connections))
+        dept-keys (into [] (remove hide?) (mapv :from dept-connections))
 
         ;; Apply windowing
         left-window (window-items dept-keys left-offset)
