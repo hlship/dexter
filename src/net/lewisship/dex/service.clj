@@ -121,7 +121,7 @@
                        "border-slate-300 bg-white hover:border-blue-300 hover:bg-blue-50"))
          :data-on:click select-action}
    [:div {:class "font-semibold text-sm text-slate-800 truncate"} name]
-   [:div {:class "text-xs text-slate-500"} (str "v" version)]])
+   [:div {:class "text-xs text-slate-500"} version]])
 
 (defn- render-overflow-indicator
   "Renders a clickable 'N more above/below' indicator for windowed columns.
