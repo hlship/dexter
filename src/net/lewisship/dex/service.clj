@@ -229,7 +229,13 @@
 
 (comment
 
+  ;; Load from pre-built test data
   (deps/load-db! "test-resources/dex/project-deps.edn")
+
+  ;; Or resolve live from a deps.edn (this project as an example)
+  (require '[net.lewisship.dex.deps-reader :as deps-reader])
+  (let [raw-data (deps-reader/read-deps "deps.edn" {})]
+    (reset! deps/*db (deps/build-db raw-data)))
 
   (start!)
 
