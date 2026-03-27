@@ -234,9 +234,9 @@
 
   ;; Or resolve live from a deps.edn (this project as an example)
   (require '[net.lewisship.dex.deps-reader :as deps-reader])
-  (let [raw-data (deps-reader/read-deps "deps.edn" {})]
+  (let [raw-data (deps-reader/read-deps "deps.edn" {:aliases [:dev :test]})]
     (reset! deps/*db (deps/build-db raw-data)))
-
+  
   (start!)
 
   (stop!)

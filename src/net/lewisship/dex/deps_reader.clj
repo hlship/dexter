@@ -24,14 +24,13 @@
 
 (defn- tree-node->deps
   "Extracts the direct dependencies from a tree node's :children map.
-  Returns a map of {lib-symbol -> {:version requested-version}} for
-  included children only."
+  Returns a map of {lib-symbol -> {:version requested-version}} for all
+  children, regardless of whether their version was selected.  The dependency
+  relationship exists even when a different version was ultimately resolved."
   [children]
   (reduce-kv
-   (fn [m lib {:keys [coord include]}]
-     (if include
-       (assoc m lib {:version (coord->version coord)})
-       m))
+   (fn [m lib {:keys [coord]}]
+     (assoc m lib {:version (coord->version coord)}))
    {}
    children))
 
@@ -63,16 +62,10 @@
   (walk-tree tree-children {} lib-map))
 
 (defn- build-root-entry
-  "Builds the ROOT artifact entry from the project's top-level deps.
-  The :deps map uses requested versions (from deps.edn), and :label
-  is derived from the project directory path."
-  [deps-edn project-label]
-  (let [top-deps (:deps deps-edn)
-        root-deps (reduce-kv
-                   (fn [m lib coord]
-                     (assoc m lib {:version (coord->version coord)}))
-                   {}
-                   top-deps)]
+  "Builds the ROOT artifact entry from the trace tree's top-level children,
+  which reflect the effective deps after alias merging."
+  [top-children project-label]
+  (let [root-deps (tree-node->deps top-children)]
     (cond-> {:version "0.0.0"}
       (seq project-label) (assoc :label project-label)
       (seq root-deps) (assoc :deps root-deps))))
@@ -97,12 +90,12 @@
         ;; Get the trace for tree structure
         trace (tree/calc-trace opts)
         dep-tree (tree/trace->tree trace)
+        top-children (:children dep-tree)
         ;; Get the basis for resolved versions
         basis (td/create-basis opts)
         lib-map (:libs basis)
-        ;; Walk tree to collect all artifacts; dep-tree is {:children {lib -> node}}
-        artifacts (collect-artifacts (:children dep-tree) lib-map)
-        ;; Build ROOT entry from the raw deps.edn
-        raw-deps-edn (td/slurp-deps deps-file)
-        root-entry (build-root-entry raw-deps-edn project-label)]
+        ;; Walk tree to collect all artifacts
+        artifacts (collect-artifacts top-children lib-map)
+        ;; Build ROOT entry from the tree's top-level children (includes alias deps)
+        root-entry (build-root-entry top-children project-label)]
     (assoc artifacts 'ROOT root-entry)))

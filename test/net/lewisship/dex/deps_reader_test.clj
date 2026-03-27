@@ -45,18 +45,28 @@
     (let [raw-data (deps-reader/read-deps test-deps-path {:aliases [:dev]})
           db (deps/build-db raw-data)]
 
-      (testing ":dev alias deps are present"
+      (testing ":dev alias deps are present as artifacts"
         (is (some? (deps/artifact-info db 'io.github.hlship/trace))
-            "trace should be present when :dev alias is active")))))
+            "trace should be present when :dev alias is active"))
+
+      (testing ":dev alias deps appear as ROOT dependencies"
+        (let [root-deps (deps/dependencies db 'ROOT)]
+          (is (some #(= 'io.github.hlship/trace (:to %)) root-deps)
+              "trace should be a direct dependency of ROOT when :dev is active"))))))
 
 (deftest read-deps-without-aliases
   (testing "resolving without :dev alias excludes dev-only deps"
     (let [raw-data (deps-reader/read-deps test-deps-path {})
           db (deps/build-db raw-data)]
 
-      (testing ":dev-only deps are absent"
+      (testing ":dev-only deps are absent as artifacts"
         (is (nil? (deps/artifact-info db 'io.github.hlship/trace))
-            "trace should not be present without :dev alias")))))
+            "trace should not be present without :dev alias"))
+
+      (testing ":dev-only deps are absent from ROOT dependencies"
+        (let [root-deps (deps/dependencies db 'ROOT)]
+          (is (not (some #(= 'io.github.hlship/trace (:to %)) root-deps))
+              "trace should not be a dependency of ROOT without :dev alias"))))))
 
 (deftest version-extraction
   (testing "Maven artifacts have proper version strings"
