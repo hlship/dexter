@@ -27,15 +27,35 @@
    {}
    raw-data))
 
+(defn- collect-nested-artifacts
+  "Finds artifacts that appear only in :deps maps but not as top-level keys,
+  and synthesizes top-level entries for them using the requested version."
+  [raw-data]
+  (reduce-kv
+   (fn [additions _artifact-key {:keys [deps]}]
+     (reduce-kv
+      (fn [additions dep-key {:keys [version]}]
+        (if (contains? raw-data dep-key)
+          additions
+          (assoc additions dep-key {:version version})))
+      additions
+      deps))
+   {}
+   raw-data))
+
 (defn build-db
   "Builds an indexed dependency database from raw EDN data.
 
+  Artifacts that appear only as nested dependencies (not top-level keys)
+  are synthesized with the requested version as their resolved version.
+
   Returns a map with:
-  - :artifacts     - the raw artifact map {key -> {:version :label :deps}}
+  - :artifacts     - the complete artifact map {key -> {:version :label :deps}}
   - :dependants    - reverse index {key -> [{:from key :requested-version v}]}"
   [raw-data]
-  {:artifacts raw-data
-   :dependants (build-dependants-index raw-data)})
+  (let [complete-data (merge (collect-nested-artifacts raw-data) raw-data)]
+    {:artifacts complete-data
+     :dependants (build-dependants-index complete-data)}))
 
 (defn artifact-keys
   "Returns all artifact keys in the database."
