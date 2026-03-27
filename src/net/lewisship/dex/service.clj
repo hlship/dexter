@@ -134,10 +134,13 @@
      (str (case direction :up "▲ " :down "▼ ") n " more")]))
 
 (defn- render-column
-  "Renders a column of artifact boxes with optional overflow indicators."
-  [{:keys [boxes before after]} column selected-key cursor]
+  "Renders a column of artifact boxes with optional overflow indicators.
+  total-height is the container height; the column uses it to vertically center
+  its content, matching the SVG arrow coordinate math."
+  [{:keys [boxes before after]} column selected-key cursor total-height]
   (let [offset-key (case column :left :left-offset :right :right-offset)]
-    [:div {:class "flex flex-col gap-3 w-[280px] min-h-0"}
+    [:div {:class "flex flex-col justify-center gap-3 w-[280px]"
+           :style (str "height:" total-height "px")}
      (render-overflow-indicator
       before :up
       (h/action (swap! cursor update offset-key dec)))
@@ -169,23 +172,23 @@
                         40)]
     [:div {:class "min-h-screen bg-slate-100 flex items-center justify-center p-8"}
      [:div {:id "dep-viewer"
-            :class "relative flex items-start gap-[120px]"
-            :style (str "min-height:" total-height "px")}
+            :class "relative flex items-center gap-[120px]"
+            :style (str "height:" total-height "px")}
 
       ;; SVG arrows layer
       (render-arrows layout-data total-height)
 
       ;; Left column: dependants
-      (render-column (:left layout-data) :left selected cursor)
+      (render-column (:left layout-data) :left selected cursor total-height)
 
       ;; Center: selected artifact
       [:div {:class "flex flex-col justify-center w-[280px]"
-             :style (str "min-height:" total-height "px")}
+             :style (str "height:" total-height "px")}
        (render-box (:selected-box layout-data) true
-                   (h/action))] ; no-op for center box (already selected)
+                   (h/action))]
 
       ;; Right column: dependencies
-      (render-column (:right layout-data) :right selected cursor)]]))
+      (render-column (:right layout-data) :right selected cursor total-height)]]))
 
 ;; --- Routes & Handler ---
 
