@@ -4,120 +4,6 @@
             [net.lewisship.dex.deps :as deps]
             [net.lewisship.dex.layout :as layout]))
 
-;; --- SVG Layout Constants ---
-;; These define the geometry used to compute arrow paths.
-;; Box dimensions should stay in sync with the Tailwind classes on rendered boxes.
-
-(def ^:const col-width 280)
-(def ^:const col-gap 120)
-(def ^:const box-height 56)
-(def ^:const box-gap 12)
-
-(def ^:const content-width
-  "Total width of the three columns plus gaps."
-  (+ (* 3 col-width) (* 2 col-gap)))
-
-(defn- col-x
-  "Returns the x-coordinate of a column's left edge, accounting for
-  horizontal centering within the container."
-  [column container-width]
-  (let [x-offset (/ (- container-width content-width) 2.0)]
-    (+ x-offset
-       (case column
-         :left 0
-         :center (+ col-width col-gap)
-         :right (* 2 (+ col-width col-gap))))))
-
-(defn- column-top-y
-  "Returns the y offset for the top of a column, centered vertically within total-height."
-  [item-count total-height]
-  (let [col-height (+ (* item-count box-height)
-                      (* (max 0 (dec item-count)) box-gap))]
-    (/ (- total-height col-height) 2.0)))
-
-(defn- box-center-y
-  "Returns the vertical center of a box at the given row within a column."
-  [row item-count total-height]
-  (let [top (column-top-y item-count total-height)]
-    (+ top (* row (+ box-height box-gap)) (/ box-height 2.0))))
-
-(defn- column-item-count
-  "Returns the number of visible items for a column keyword given the layout data."
-  [layout-data column]
-  (case column
-    :left (count (get-in layout-data [:left :boxes]))
-    :center 1
-    :right (count (get-in layout-data [:right :boxes]))))
-
-(defn- svg-arrow-path
-  "Generates an SVG cubic bezier path string for a connection arrow."
-  [{:keys [from-col from-row from-count to-col to-row to-count
-           total-height container-width connection-type]}]
-  (if (= connection-type :intra-column)
-    ;; Intra-column: arc that bows outward from the column
-    (let [x (if (= from-col :left)
-              (col-x :left container-width)
-              (+ (col-x from-col container-width) col-width))
-          y1 (box-center-y from-row from-count total-height)
-          y2 (box-center-y to-row to-count total-height)
-          bow (if (= from-col :left) -40 40)
-          cx (+ x bow)]
-      (str "M" x "," y1
-           " C" cx "," y1 " " cx "," y2 " " x "," y2))
-    ;; Cross-column: gentle horizontal bezier
-    (let [x1 (+ (col-x from-col container-width) col-width)
-          y1 (box-center-y from-row from-count total-height)
-          x2 (col-x to-col container-width)
-          y2 (box-center-y to-row to-count total-height)
-          cx (/ (+ x1 x2) 2)]
-      (str "M" x1 "," y1
-           " C" cx "," y1 " " cx "," y2 " " x2 "," y2))))
-
-(defn- render-arrow-defs
-  "SVG <defs> with arrowhead markers."
-  []
-  [:defs
-   [:marker {:id "arrowhead"
-             :markerWidth "8"
-             :markerHeight "6"
-             :refX "8"
-             :refY "3"
-             :orient "auto"
-             :markerUnits "strokeWidth"}
-    [:path {:d "M0,0 L8,3 L0,6 Z" :fill "#64748b"}]]])
-
-(defn- render-arrows
-  "Renders the SVG overlay with connection arrows between visible artifacts.
-  container-width and container-height are the actual pixel dimensions of
-  the dep-viewer, reported by the browser via ResizeObserver.
-  The SVG uses 100% width/height with no viewBox, so coordinates map
-  directly to CSS pixels — no scaling."
-  [layout-data container-width container-height]
-  [:svg {:class "absolute inset-0 pointer-events-none"
-         :width "100%"
-         :height "100%"
-         :xmlns "http://www.w3.org/2000/svg"}
-   (render-arrow-defs)
-   (into [:g]
-         (map (fn [{:keys [from-column from-row to-column to-row connection-type]}]
-                (let [from-count (column-item-count layout-data from-column)
-                      to-count (column-item-count layout-data to-column)]
-                  [:path {:d (svg-arrow-path
-                              {:from-col from-column
-                               :from-row from-row
-                               :from-count from-count
-                               :to-col to-column
-                               :to-row to-row
-                               :to-count to-count
-                               :total-height container-height
-                               :container-width container-width
-                               :connection-type connection-type})
-                          :stroke "#64748b"
-                          :stroke-width "2"
-                          :fill "none"
-                          :marker-end "url(#arrowhead)"}])))
-         (:connections layout-data))])
-
 ;; --- Box Rendering ---
 
 (defn- render-box
@@ -164,6 +50,21 @@
       after :down
       (h/action (swap! cursor update offset-key inc)))]))
 
+;; --- Connection Data ---
+
+(defn- connections->json
+  "Converts layout connection data to JSON for client-side arrow rendering.
+  Each connection includes from/to element IDs, version info, and connection type."
+  [connections]
+  (json/generate-string
+   (mapv (fn [{:keys [from-id to-id requested-version resolved-version connection-type]}]
+           {:fromId from-id
+            :toId to-id
+            :requestedVersion requested-version
+            :resolvedVersion resolved-version
+            :type (name connection-type)})
+         connections)))
+
 ;; --- Page Rendering ---
 
 (defn- render-toolbar
@@ -188,45 +89,33 @@
              :d "M9.293 2.293a1 1 0 011.414 0l7 7A1 1 0 0117 11h-1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-3a1 1 0 00-1-1H9a1 1 0 00-1 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-6H3a1 1 0 01-.707-1.707l7-7z"}]]]
    ;; Current selection label
    [:span {:class "text-sm text-slate-500"}
-    (str (get-in @cursor [:selected]))]])
+    (str selected)]])
 
 (defn home-page [_]
   (let [db @deps/*db
         cursor (h/tab-cursor :view {:selected 'ROOT
                                     :left-offset 0
                                     :right-offset 0
-                                    :hidden-libs layout/default-hidden-libs
-                                    :viewport nil})
-        {:keys [selected left-offset right-offset hidden-libs viewport]} @cursor
-        layout-data (layout/compute-layout db selected left-offset right-offset hidden-libs)
-        ;; Use actual viewport dimensions when available, fall back to calculated estimates
-        container-width (or (:width viewport) content-width)
-        container-height (let [max-col-count (max 1
-                                                  (count (get-in layout-data [:left :boxes]))
-                                                  (count (get-in layout-data [:right :boxes])))
-                               content-height (+ (* max-col-count box-height)
-                                                 (* (max 0 (dec max-col-count)) box-gap)
-                                                 40)]
-                           (if viewport
-                             (max content-height (:height viewport))
-                             content-height))]
+                                    :hidden-libs layout/default-hidden-libs})
+        {:keys [selected left-offset right-offset hidden-libs]} @cursor
+        layout-data (layout/compute-layout db selected left-offset right-offset hidden-libs)]
     ;; Full-viewport flex column: toolbar on top, content fills the rest
     [:div {:class "h-screen flex flex-col bg-slate-100"}
      ;; Toolbar (shrink-0 keeps it at natural size)
      (render-toolbar cursor selected)
 
      ;; Content area fills remaining space, centers the graph
-     ;; data-report-size uses ResizeObserver to POST {width, height} via $form-data
+     ;; data-draw-arrows passes connection JSON to the client-side arrow plugin
      [:div {:id "dep-viewer"
             :class "flex-1 relative flex justify-center gap-[120px] overflow-auto"
-            :data-report-size (h/action
-                               (when $form-data
-                                 (swap! cursor assoc :viewport
-                                        {:width (parse-long (str (:width $form-data)))
-                                         :height (parse-long (str (:height $form-data)))})))}
+            :data-draw-arrows (connections->json (:connections layout-data))}
 
-      ;; SVG arrows layer (uses actual container dimensions for 1:1 pixel mapping)
-      (render-arrows layout-data container-width container-height)
+      ;; Empty SVG container — client-side JS populates arrow paths
+      [:svg {:id "arrow-overlay"
+             :class "absolute inset-0 pointer-events-none"
+             :width "100%"
+             :height "100%"
+             :xmlns "http://www.w3.org/2000/svg"}]
 
       ;; Left column: dependants
       (render-column (:left layout-data) :left selected cursor)
