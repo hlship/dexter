@@ -29,6 +29,10 @@ function ensureArrowDefs(svg) {
 // For cross-column: horizontal curve from source right edge to target left edge.
 // For intra-column: arc that bows outward.
 function computeArrowPath(fromRect, toRect, containerRect, type) {
+  // Blend factor: control points are shifted 20% toward each other's y,
+  // giving arrowheads a natural angle on steep connections.
+  const blend = 0.2;
+
   if (type === "intra-column") {
     // Determine which side to bow from
     const isLeft = fromRect.right < containerRect.left + containerRect.width / 2;
@@ -37,7 +41,9 @@ function computeArrowPath(fromRect, toRect, containerRect, type) {
     const y2 = toRect.top + toRect.height / 2 - containerRect.top;
     const bow = isLeft ? -40 : 40;
     const cx = x + bow;
-    return `M${x},${y1} C${cx},${y1} ${cx},${y2} ${x},${y2}`;
+    const cy1 = y1 + (y2 - y1) * blend;
+    const cy2 = y2 - (y2 - y1) * blend;
+    return `M${x},${y1} C${cx},${cy1} ${cx},${cy2} ${x},${y2}`;
   }
 
   // Cross-column: gentle horizontal bezier
@@ -46,7 +52,9 @@ function computeArrowPath(fromRect, toRect, containerRect, type) {
   const x2 = toRect.left - containerRect.left;
   const y2 = toRect.top + toRect.height / 2 - containerRect.top;
   const cx = (x1 + x2) / 2;
-  return `M${x1},${y1} C${cx},${y1} ${cx},${y2} ${x2},${y2}`;
+  const cy1 = y1 + (y2 - y1) * blend;
+  const cy2 = y2 - (y2 - y1) * blend;
+  return `M${x1},${y1} C${cx},${cy1} ${cx},${cy2} ${x2},${y2}`;
 }
 
 // Draws all arrows into the SVG overlay based on connection data and actual box positions.
