@@ -77,8 +77,15 @@
                           :to-row (:row to-box)
                           :requested-version requested-version
                           :resolved-version resolved-version
-                          :connection-type (if (= (:column from-box) (:column to-box))
+                          :connection-type (cond
+                                             (= (:column from-box) (:column to-box))
                                              :intra-column
+
+                                             (and (= :left (:column from-box))
+                                                  (= :right (:column to-box)))
+                                             :bypass
+
+                                             :else
                                              :cross-column)})))
                    (deps/dependencies db from-key))))
           visible-keys)))

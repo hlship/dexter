@@ -28,12 +28,13 @@ function ensureArrowDefs(svg) {
 // Computes a cubic bezier path between two box elements.
 // For cross-column: horizontal curve from source right edge to target left edge.
 // For intra-column: arc that bows outward.
-function computeArrowPath(fromRect, toRect, containerRect, type) {
+// For bypass: arc above or below the center node to avoid crossing through it.
+function computeArrowPath(fromRect, toRect, containerRect, conn) {
   // Blend factor: control points are shifted 20% toward each other's y,
   // giving arrowheads a natural angle on steep connections.
   const blend = 0.2;
 
-  if (type === "intra-column") {
+  if (conn.type === "intra-column") {
     // Determine which side to bow from
     const isLeft = fromRect.right < containerRect.left + containerRect.width / 2;
     const x = isLeft ? fromRect.left - containerRect.left : fromRect.right - containerRect.left;
@@ -44,6 +45,32 @@ function computeArrowPath(fromRect, toRect, containerRect, type) {
     const cy1 = y1 + (y2 - y1) * blend;
     const cy2 = y2 - (y2 - y1) * blend;
     return `M${x},${y1} C${cx},${cy1} ${cx},${cy2} ${x},${y2}`;
+  }
+
+  if (conn.type === "bypass" && conn.centerId) {
+    // Route around the center node: arc above or below to avoid crossing through it
+    const centerEl = document.getElementById(conn.centerId);
+    if (centerEl) {
+      const centerRect = centerEl.getBoundingClientRect();
+      const x1 = fromRect.right - containerRect.left;
+      const y1 = fromRect.top + fromRect.height / 2 - containerRect.top;
+      const x2 = toRect.left - containerRect.left;
+      const y2 = toRect.top + toRect.height / 2 - containerRect.top;
+      const midY = (y1 + y2) / 2;
+      const centerY = centerRect.top + centerRect.height / 2 - containerRect.top;
+      const centerTop = centerRect.top - containerRect.top;
+      const centerBottom = centerRect.bottom - containerRect.top;
+
+      // Route above if midpoint is above center, otherwise below
+      const goAbove = midY <= centerY;
+      const clearance = 30;
+      const peakY = goAbove ? centerTop - clearance : centerBottom + clearance;
+
+      // Two-segment cubic: source → peak above/below center → target
+      const cx1 = x1 + (x2 - x1) * 0.3;
+      const cx2 = x1 + (x2 - x1) * 0.7;
+      return `M${x1},${y1} C${cx1},${peakY} ${cx2},${peakY} ${x2},${y2}`;
+    }
   }
 
   // Cross-column: gentle horizontal bezier
@@ -77,7 +104,7 @@ function drawArrows(container, connections) {
     const fromRect = fromEl.getBoundingClientRect();
     const toRect = toEl.getBoundingClientRect();
 
-    const d = computeArrowPath(fromRect, toRect, containerRect, conn.type);
+    const d = computeArrowPath(fromRect, toRect, containerRect, conn);
 
     const path = document.createElementNS(SVG_NS, "path");
     path.classList.add("arrow");

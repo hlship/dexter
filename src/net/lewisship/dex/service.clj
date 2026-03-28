@@ -54,15 +54,18 @@
 
 (defn- connections->json
   "Converts layout connection data to JSON for client-side arrow rendering.
-  Each connection includes from/to element IDs, version info, and connection type."
-  [connections]
+  Each connection includes from/to element IDs, version info, and connection type.
+  Bypass connections also include the center box ID for routing around it."
+  [connections center-id]
   (json/generate-string
    (mapv (fn [{:keys [from-id to-id requested-version resolved-version connection-type]}]
-           {:fromId from-id
-            :toId to-id
-            :requestedVersion requested-version
-            :resolvedVersion resolved-version
-            :type (name connection-type)})
+           (cond-> {:fromId from-id
+                    :toId to-id
+                    :requestedVersion requested-version
+                    :resolvedVersion resolved-version
+                    :type (name connection-type)}
+             (= :bypass connection-type)
+             (assoc :centerId center-id)))
          connections)))
 
 ;; --- Page Rendering ---
@@ -108,7 +111,8 @@
      ;; data-draw-arrows passes connection JSON to the client-side arrow plugin
      [:div {:id "dep-viewer"
             :class "flex-1 relative flex justify-center gap-[120px] overflow-auto"
-            :data-draw-arrows (connections->json (:connections layout-data))}
+            :data-draw-arrows (connections->json (:connections layout-data)
+                                                  (:id (:selected-box layout-data)))}
 
       ;; Empty SVG container — client-side JS populates arrow paths
       [:svg {:id "arrow-overlay"
