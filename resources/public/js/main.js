@@ -198,11 +198,59 @@ function drawArrows(container, connections) {
       tooltip.classList.add("opacity-0");
     });
   }
+
+}
+
+// --- FLIP Animation for artifact boxes ---
+// The draw-arrows plugin's apply() is called by Datastar after each DOM morph,
+// making it the reliable signal that layout has changed. No MutationObserver needed.
+
+const FLIP_DURATION = 300;
+const FLIP_EASING = "ease-in-out";
+const ARROW_FADE_MS = 150;
+
+// Snapshot of box positions from the previous render.
+let boxSnapshot = new Map();
+let isFirstRender = true;
+
+// Snapshot positions of all artifact boxes.
+function snapshotBoxPositions() {
+  const positions = new Map();
+  document.querySelectorAll('[id^="box-"]').forEach((el) => {
+    const rect = el.getBoundingClientRect();
+    positions.set(el.id, { top: rect.top, left: rect.left });
+  });
+  return positions;
+}
+
+// FLIP animate boxes from old positions to new, fade in new boxes.
+function animateBoxes(oldPositions) {
+  document.querySelectorAll('[id^="box-"]').forEach((el) => {
+    const newRect = el.getBoundingClientRect();
+    const old = oldPositions.get(el.id);
+
+    if (old) {
+      const dx = old.left - newRect.left;
+      const dy = old.top - newRect.top;
+      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+        el.animate(
+          [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "translate(0, 0)" }],
+          { duration: FLIP_DURATION, easing: FLIP_EASING }
+        );
+      }
+    } else {
+      el.animate([{ opacity: 0, transform: "scale(0.95)" }, { opacity: 1, transform: "scale(1)" }], {
+        duration: FLIP_DURATION,
+        easing: FLIP_EASING,
+      });
+    }
+  });
 }
 
 // Datastar attribute plugin: data-draw-arrows="<connections-json>"
-// Reads connection JSON, measures box positions, draws SVG arrows.
-// Redraws on resize.
+// Called by Datastar after each DOM morph. Orchestrates:
+// 1. FLIP animation of boxes (using snapshot from previous render)
+// 2. Arrow fade-out → redraw at final positions → fade-in
 attribute({
   name: "draw-arrows",
   keyReq: "denied",
@@ -216,16 +264,46 @@ attribute({
       return () => {};
     }
 
-    // Initial draw (deferred to let layout settle)
-    requestAnimationFrame(() => drawArrows(el, connections));
+    const svg = el.querySelector("#arrow-overlay");
 
-    // Redraw on resize
+    if (isFirstRender) {
+      // First render: just draw arrows immediately, take initial snapshot
+      isFirstRender = false;
+      requestAnimationFrame(() => {
+        drawArrows(el, connections);
+        boxSnapshot = snapshotBoxPositions();
+      });
+    } else {
+      // Subsequent renders: animate boxes, fade arrows out/in
+      const oldPositions = boxSnapshot;
+
+      // Fade out arrows immediately
+      if (svg) {
+        svg.style.transition = `opacity ${ARROW_FADE_MS}ms ease-in-out`;
+        svg.style.opacity = "0";
+      }
+
+      // FLIP animate boxes from old positions to new
+      requestAnimationFrame(() => {
+        animateBoxes(oldPositions);
+
+        // After boxes settle, redraw arrows at final positions and fade in
+        setTimeout(() => {
+          drawArrows(el, connections);
+          if (svg) {
+            svg.style.opacity = "1";
+          }
+          boxSnapshot = snapshotBoxPositions();
+        }, FLIP_DURATION);
+      });
+    }
+
+    // Redraw on window resize (no animation needed)
     const resizeObserver = new ResizeObserver(() => {
       requestAnimationFrame(() => drawArrows(el, connections));
     });
     resizeObserver.observe(el);
 
-    // Cleanup
     return () => {
       resizeObserver.disconnect();
     };

@@ -9,7 +9,8 @@
 (defn- render-box
   "Renders a single artifact box as a Tailwind-styled div.
   select-action is a Datastar expression string returned by h/action.
-  Leaf nodes (no dependencies) are annotated with a grey right border marker."
+  Leaf nodes (no dependencies) are annotated with a grey right border marker.
+  Each box has a unique view-transition-name for animated transitions."
   [{:keys [key name version leaf?]} selected? select-action]
   [:div {:id (str "box-" key)
          :class (str "w-full px-4 py-2 rounded-lg border-2 cursor-pointer "
@@ -121,6 +122,7 @@
       ;; Empty SVG container — client-side JS populates arrow paths
       [:svg {:id "arrow-overlay"
              :class "absolute inset-0 pointer-events-none"
+
              :width "100%"
              :height "100%"
              :xmlns "http://www.w3.org/2000/svg"}]
@@ -179,9 +181,10 @@
   (deps/load-db! "test-resources/dex/project-deps.edn")
 
   ;; Or resolve live from a deps.edn (this project as an example)
-  (require '[net.lewisship.dex.deps-reader :as deps-reader])
-  (let [raw-data (deps-reader/read-deps "deps.edn" {:aliases [:dev :test]})]
-    (reset! deps/*db (deps/build-db raw-data)))
+  (do
+    (require '[net.lewisship.dex.deps-reader :as deps-reader])
+    (let [raw-data (deps-reader/read-deps "deps.edn" {:aliases [:dev :test]})]
+      (reset! deps/*db (deps/build-db raw-data))))
 
   (start!)
 
