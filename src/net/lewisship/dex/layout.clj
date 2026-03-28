@@ -87,6 +87,14 @@
   [requested resolved]
   (get match->color (version-match requested resolved) "#64748b"))
 
+(def ^:private match-severity
+  "Severity ordering for version match classifications.
+  Higher values are more significant (worse)."
+  {:exact 0
+   :compatible 1
+   :unknown 2
+   :incompatible 3})
+
 (defn- window-items
   "Applies windowing to a collection of items.
 
@@ -212,9 +220,31 @@
         visible-keys (mapv :key all-boxes)
 
         ;; Find all connections between visible artifacts
-        connections (find-visible-connections db visible-keys box-lookup)]
+        connections (find-visible-connections db visible-keys box-lookup)
 
-    {:selected-box selected-box
-     :left (assoc left-window :boxes left-boxes)
-     :right (assoc right-window :boxes right-boxes)
+        ;; Compute worst version mismatch color per origin box across all connections.
+        ;; A box may depend on multiple artifacts, each with different version match
+        ;; levels. The border shows the most significant (worst) mismatch.
+        worst-match-by-origin
+        (reduce (fn [acc {:keys [from requested-version resolved-version]}]
+                  (let [m (version-match requested-version resolved-version)
+                        prev (get acc from :exact)]
+                    (if (> (match-severity m) (match-severity prev))
+                      (assoc acc from m)
+                      acc)))
+                {}
+                connections)
+
+        ;; Annotate boxes with version-color for the most significant mismatch
+        annotate-boxes (fn [boxes]
+                         (mapv (fn [box]
+                                 (let [m (get worst-match-by-origin (:key box))]
+                                   (if (and m (not= :exact m))
+                                     (assoc box :version-color (match->color m))
+                                     box)))
+                               boxes))]
+
+    {:selected-box (first (annotate-boxes [selected-box]))
+     :left (assoc left-window :boxes (annotate-boxes left-boxes))
+     :right (assoc right-window :boxes (annotate-boxes right-boxes))
      :connections connections}))

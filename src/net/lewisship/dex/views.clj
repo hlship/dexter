@@ -13,16 +13,22 @@
 (defn- render-box
   "Renders a single artifact box as a Tailwind-styled div.
   select-action is a Datastar expression string returned by h/action.
-  Leaf nodes (no dependencies) are annotated with a grey right border marker."
-  [{:keys [key name version leaf?]} selected? select-action]
+  Leaf nodes (no dependencies) are annotated with a grey right border marker.
+  Dependencies with version mismatches get a colored right border."
+  [{:keys [key name version leaf? version-color]} selected? select-action]
   [:div {:id (str "box-" key)
          :class (str "w-full px-4 py-2 rounded-lg border-2 cursor-pointer "
                      "transition-colors duration-150 "
                      (if selected?
                        "border-blue-500 bg-blue-50 shadow-md"
                        "border-slate-300 bg-white hover:border-blue-300 hover:bg-blue-50")
-                     (when leaf?
-                       " border-r-4 border-r-slate-400"))
+                     (cond
+                       ;; Version mismatch takes priority — thick colored right border
+                       version-color " border-r-4"
+                       ;; Leaf node — grey right border
+                       leaf? " border-r-4 border-r-slate-400"))
+         :style (when version-color
+                  (str "border-right-color: " version-color))
          :data-on:click select-action}
    [:div {:class "font-semibold text-sm text-slate-800 truncate" :title name} name]
    [:div {:class "text-xs text-slate-500"} version]])
