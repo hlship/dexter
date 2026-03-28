@@ -3,26 +3,62 @@ import { attribute } from "datastar";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-// Creates the <defs> element with arrowhead marker, if not already present.
+// Arrow color palette — must match server-side version-match-color values.
+const ARROW_COLORS = ["#000000", "#16a34a", "#dc2626", "#ca8a04", "#64748b"];
+
+// Creates <defs> with arrowhead markers and minimal SVG styles.
 function ensureArrowDefs(svg) {
-  if (svg.querySelector("#arrowhead")) return;
+  if (svg.querySelector("#arrowhead-0")) return;
 
+  // Minimal SVG styles — just pointer-events for arrow interactivity
+  const style = document.createElementNS(SVG_NS, "style");
+  style.textContent = `
+    .arrow-group { pointer-events: visibleStroke; cursor: default; }
+    .arrow-hit { pointer-events: stroke; }
+  `;
+  svg.appendChild(style);
+
+  // One arrowhead marker per color
   const defs = document.createElementNS(SVG_NS, "defs");
-  const marker = document.createElementNS(SVG_NS, "marker");
-  marker.setAttribute("id", "arrowhead");
-  marker.setAttribute("markerWidth", "8");
-  marker.setAttribute("markerHeight", "6");
-  marker.setAttribute("refX", "8");
-  marker.setAttribute("refY", "3");
-  marker.setAttribute("orient", "auto");
-  marker.setAttribute("markerUnits", "strokeWidth");
+  ARROW_COLORS.forEach((color, i) => {
+    const marker = document.createElementNS(SVG_NS, "marker");
+    marker.setAttribute("id", `arrowhead-${i}`);
+    marker.setAttribute("markerWidth", "8");
+    marker.setAttribute("markerHeight", "6");
+    marker.setAttribute("refX", "8");
+    marker.setAttribute("refY", "3");
+    marker.setAttribute("orient", "auto");
+    marker.setAttribute("markerUnits", "strokeWidth");
 
-  const path = document.createElementNS(SVG_NS, "path");
-  path.setAttribute("d", "M0,0 L8,3 L0,6 Z");
-  path.setAttribute("fill", "#64748b");
-  marker.appendChild(path);
-  defs.appendChild(marker);
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("d", "M0,0 L8,3 L0,6 Z");
+    path.setAttribute("fill", color);
+    marker.appendChild(path);
+    defs.appendChild(marker);
+  });
   svg.appendChild(defs);
+}
+
+// Returns the marker URL for a given arrow color.
+function markerForColor(color) {
+  const idx = ARROW_COLORS.indexOf(color);
+  return `url(#arrowhead-${idx >= 0 ? idx : ARROW_COLORS.length - 1})`;
+}
+
+// Creates or reuses a shared HTML tooltip for version mismatch labels.
+// Positioned absolutely within the dep-viewer container.
+function getOrCreateTooltip(container) {
+  let tip = container.querySelector("#arrow-tooltip");
+  if (!tip) {
+    tip = document.createElement("div");
+    tip.id = "arrow-tooltip";
+    tip.className =
+      "absolute pointer-events-none opacity-0 transition-opacity duration-150 " +
+      "px-2 py-1 rounded-md border border-slate-300 bg-white shadow-md " +
+      "text-sm font-mono font-semibold z-10 -translate-x-1/2 -translate-y-full";
+    container.appendChild(tip);
+  }
+  return tip;
 }
 
 // Computes a cubic bezier path between two box elements.
@@ -91,10 +127,12 @@ function drawArrows(container, connections) {
 
   const containerRect = container.getBoundingClientRect();
 
-  // Clear existing paths (keep defs)
-  svg.querySelectorAll("path.arrow").forEach((p) => p.remove());
+  // Clear existing arrow groups (keep defs and style)
+  svg.querySelectorAll(".arrow-group").forEach((g) => g.remove());
 
   ensureArrowDefs(svg);
+
+  const tooltip = getOrCreateTooltip(container);
 
   for (const conn of connections) {
     const fromEl = document.getElementById(conn.fromId);
@@ -105,15 +143,60 @@ function drawArrows(container, connections) {
     const toRect = toEl.getBoundingClientRect();
 
     const d = computeArrowPath(fromRect, toRect, containerRect, conn);
+    const color = conn.color || "#64748b";
+    const isMismatch = conn.requestedVersion !== conn.resolvedVersion;
 
-    const path = document.createElementNS(SVG_NS, "path");
-    path.classList.add("arrow");
-    path.setAttribute("d", d);
-    path.setAttribute("stroke", "#64748b");
-    path.setAttribute("stroke-width", "2");
-    path.setAttribute("fill", "none");
-    path.setAttribute("marker-end", "url(#arrowhead)");
-    svg.appendChild(path);
+    // Group: invisible hit area + visible arrow
+    const group = document.createElementNS(SVG_NS, "g");
+    group.classList.add("arrow-group");
+
+    // Wide invisible path for easier hover targeting
+    const hitArea = document.createElementNS(SVG_NS, "path");
+    hitArea.classList.add("arrow-hit");
+    hitArea.setAttribute("d", d);
+    hitArea.setAttribute("stroke", "transparent");
+    hitArea.setAttribute("stroke-width", "14");
+    hitArea.setAttribute("fill", "none");
+    group.appendChild(hitArea);
+
+    // Visible arrow path
+    const arrowPath = document.createElementNS(SVG_NS, "path");
+    arrowPath.classList.add("arrow");
+    arrowPath.setAttribute("d", d);
+    arrowPath.setAttribute("stroke", color);
+    arrowPath.setAttribute("stroke-width", "2");
+    arrowPath.setAttribute("fill", "none");
+    arrowPath.setAttribute("marker-end", markerForColor(color));
+    group.appendChild(arrowPath);
+
+    svg.appendChild(group);
+
+    // Hover: thicken + brighten arrow, show version tooltip for mismatches
+    group.addEventListener("mouseenter", () => {
+      arrowPath.setAttribute("stroke-width", "4");
+      arrowPath.style.filter = "brightness(1.4)";
+
+      if (isMismatch) {
+        const totalLen = arrowPath.getTotalLength();
+        const mid = arrowPath.getPointAtLength(totalLen / 2);
+
+        tooltip.textContent = conn.requestedVersion;
+        tooltip.style.color = color;
+        tooltip.style.borderColor = color;
+        tooltip.style.left = `${mid.x}px`;
+        tooltip.style.top = `${mid.y - 6}px`;
+        tooltip.classList.remove("opacity-0");
+        tooltip.classList.add("opacity-100");
+      }
+    });
+
+    group.addEventListener("mouseleave", () => {
+      arrowPath.setAttribute("stroke-width", "2");
+      arrowPath.style.filter = "";
+
+      tooltip.classList.remove("opacity-100");
+      tooltip.classList.add("opacity-0");
+    });
   }
 }
 

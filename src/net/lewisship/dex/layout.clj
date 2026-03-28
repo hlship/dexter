@@ -7,7 +7,8 @@
   - Windowed subsets when columns overflow
   - Connections between all visible artifacts that have dependency relationships,
     tagged with version info and connection type."
-  (:require [net.lewisship.dex.deps :as deps]))
+  (:require [net.lewisship.dex.deps :as deps]
+            [version-clj.core :as ver]))
 
 ;; Maximum number of nodes visible in a single column before windowing kicks in.
 (def ^:const max-visible 8)
@@ -16,6 +17,75 @@
   "Default set of libs to hide from dependency/dependant columns.
   These are ubiquitous dependencies that add clutter without insight."
   #{'org.clojure/clojure})
+
+;; --- Version Compatibility ---
+
+(def ^:private git-sha-pattern
+  "Matches short (7-8 char) or full (40 char) hex strings typical of git SHAs."
+  #"^[0-9a-f]{7,40}$")
+
+(defn- git-sha?
+  "Returns true if the version string looks like a git SHA."
+  [v]
+  (boolean (re-matches git-sha-pattern v)))
+
+(defn- parse-major-minor
+  "Extracts [major minor] from a version string using version-clj.
+  Returns nil if the version can't be parsed into numeric components."
+  [v]
+  (try
+    (let [{:keys [version]} (ver/parse v)
+          ;; version is a vector of sub-sequences, e.g. [(1 2 3)] for "1.2.3"
+          nums (first version)]
+      (when (and (sequential? nums) (>= (count nums) 2)
+                 (number? (first nums)) (number? (second nums)))
+        [(first nums) (second nums)]))
+    (catch Exception _ nil)))
+
+(defn version-match
+  "Classifies the compatibility between a requested and resolved version.
+
+  Returns a keyword:
+  - :exact        - versions are identical strings
+  - :compatible   - same major version (1.x+) or same major.minor (0.x)
+  - :incompatible - different major version (1.x+) or different major.minor (0.x)
+  - :unknown      - git SHA, local path, or unparseable versions"
+  [requested resolved]
+  (cond
+    (= requested resolved)
+    :exact
+
+    (or (nil? requested) (nil? resolved)
+        (git-sha? requested) (git-sha? resolved)
+        (= "unknown" requested) (= "unknown" resolved))
+    :unknown
+
+    :else
+    (let [req-mm (parse-major-minor requested)
+          res-mm (parse-major-minor resolved)]
+      (if (and req-mm res-mm)
+        (let [[req-major req-minor] req-mm
+              [res-major res-minor] res-mm]
+          (if (if (zero? req-major)
+                ;; For 0.x, minor version must also match
+                (and (= req-major res-major) (= req-minor res-minor))
+                ;; For 1.x+, just major must match
+                (= req-major res-major))
+            :compatible
+            :incompatible))
+        :unknown))))
+
+(def ^:private match->color
+  "Maps version match classification to arrow color."
+  {:exact        "#000000"   ; black
+   :compatible   "#16a34a"   ; green
+   :incompatible "#dc2626"   ; red
+   :unknown      "#ca8a04"}) ; yellow
+
+(defn version-match-color
+  "Returns the arrow color for a version compatibility classification."
+  [requested resolved]
+  (get match->color (version-match requested resolved) "#64748b"))
 
 (defn- window-items
   "Applies windowing to a collection of items.
@@ -46,6 +116,7 @@
      :key artifact-key
      :name (or (:label info) (str artifact-key))
      :version (:version info)
+     :leaf? (empty? (:deps info))
      :column column
      :row row}))
 
@@ -77,6 +148,7 @@
                           :to-row (:row to-box)
                           :requested-version requested-version
                           :resolved-version resolved-version
+                          :color (version-match-color requested-version resolved-version)
                           :connection-type (cond
                                              (= (:column from-box) (:column to-box))
                                              :intra-column

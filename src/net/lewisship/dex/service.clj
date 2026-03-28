@@ -8,16 +8,19 @@
 
 (defn- render-box
   "Renders a single artifact box as a Tailwind-styled div.
-  select-action is a Datastar expression string returned by h/action."
-  [{:keys [key name version]} selected? select-action]
+  select-action is a Datastar expression string returned by h/action.
+  Leaf nodes (no dependencies) are annotated with a grey right border marker."
+  [{:keys [key name version leaf?]} selected? select-action]
   [:div {:id (str "box-" key)
          :class (str "w-full px-4 py-2 rounded-lg border-2 cursor-pointer "
                      "transition-colors duration-150 "
                      (if selected?
                        "border-blue-500 bg-blue-50 shadow-md"
-                       "border-slate-300 bg-white hover:border-blue-300 hover:bg-blue-50"))
+                       "border-slate-300 bg-white hover:border-blue-300 hover:bg-blue-50")
+                     (when leaf?
+                       " border-r-4 border-r-slate-400"))
          :data-on:click select-action}
-   [:div {:class "font-semibold text-sm text-slate-800 truncate"} name]
+   [:div {:class "font-semibold text-sm text-slate-800 truncate" :title name} name]
    [:div {:class "text-xs text-slate-500"} version]])
 
 (defn- render-overflow-indicator
@@ -58,12 +61,13 @@
   Bypass connections also include the center box ID for routing around it."
   [connections center-id]
   (json/generate-string
-   (mapv (fn [{:keys [from-id to-id requested-version resolved-version connection-type]}]
+   (mapv (fn [{:keys [from-id to-id requested-version resolved-version connection-type color]}]
            (cond-> {:fromId from-id
                     :toId to-id
                     :requestedVersion requested-version
                     :resolvedVersion resolved-version
-                    :type (name connection-type)}
+                    :type (name connection-type)
+                    :color color}
              (= :bypass connection-type)
              (assoc :centerId center-id)))
          connections)))
