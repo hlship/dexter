@@ -23,10 +23,10 @@
                        "border-blue-500 bg-blue-50 shadow-md"
                        "border-slate-300 bg-white hover:border-blue-300 hover:bg-blue-50")
                      (cond
-                       ;; Version mismatch takes priority — thick colored right border
-                       version-color " border-r-4"
-                       ;; Leaf node — grey right border
-                       leaf? " border-r-4 border-r-slate-400"))
+                       ;; Version mismatch takes priority — wide colored right border
+                       version-color " border-r-[10px]"
+                       ;; Leaf node — wide grey right border
+                       leaf? " border-r-[10px] border-r-slate-400"))
          :style (when version-color
                   (str "border-right-color: " version-color))
          :data-on:click select-action}

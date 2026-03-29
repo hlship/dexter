@@ -212,6 +212,8 @@ const ARROW_FADE_MS = 150;
 // Snapshot of box positions from the previous render.
 let boxSnapshot = new Map();
 let isFirstRender = true;
+let pendingTimeout = null;
+let activeAnimations = [];
 
 // Snapshot positions of all artifact boxes.
 function snapshotBoxPositions() {
@@ -223,8 +225,22 @@ function snapshotBoxPositions() {
   return positions;
 }
 
+// Cancel any in-flight FLIP animations and pending timeouts.
+function cancelPendingFlip() {
+  if (pendingTimeout) {
+    clearTimeout(pendingTimeout);
+    pendingTimeout = null;
+  }
+  for (const anim of activeAnimations) {
+    anim.cancel();
+  }
+  activeAnimations = [];
+}
+
 // FLIP animate boxes from old positions to new, fade in new boxes.
+// Returns array of Animation objects for cancellation.
 function animateBoxes(oldPositions) {
+  const anims = [];
   document.querySelectorAll('[id^="box-"]').forEach((el) => {
     const newRect = el.getBoundingClientRect();
     const old = oldPositions.get(el.id);
@@ -233,18 +249,23 @@ function animateBoxes(oldPositions) {
       const dx = old.left - newRect.left;
       const dy = old.top - newRect.top;
       if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-        el.animate(
-          [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "translate(0, 0)" }],
-          { duration: FLIP_DURATION, easing: FLIP_EASING }
+        anims.push(
+          el.animate(
+            [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "translate(0, 0)" }],
+            { duration: FLIP_DURATION, easing: FLIP_EASING }
+          )
         );
       }
     } else {
-      el.animate([{ opacity: 0, transform: "scale(0.95)" }, { opacity: 1, transform: "scale(1)" }], {
-        duration: FLIP_DURATION,
-        easing: FLIP_EASING,
-      });
+      anims.push(
+        el.animate([{ opacity: 0, transform: "scale(0.95)" }, { opacity: 1, transform: "scale(1)" }], {
+          duration: FLIP_DURATION,
+          easing: FLIP_EASING,
+        })
+      );
     }
   });
+  return anims;
 }
 
 // Datastar attribute plugin: data-draw-arrows="<connections-json>"
@@ -274,8 +295,14 @@ attribute({
         boxSnapshot = snapshotBoxPositions();
       });
     } else {
-      // Subsequent renders: animate boxes, fade arrows out/in
+      // Cancel any in-flight animation from a previous rapid click
+      cancelPendingFlip();
+
+      // Capture old positions, then immediately update snapshot to current
+      // DOM positions so the next rapid click animates from here, not from
+      // two renders ago.
       const oldPositions = boxSnapshot;
+      boxSnapshot = snapshotBoxPositions();
 
       // Fade out arrows immediately
       if (svg) {
@@ -285,14 +312,17 @@ attribute({
 
       // FLIP animate boxes from old positions to new
       requestAnimationFrame(() => {
-        animateBoxes(oldPositions);
+        activeAnimations = animateBoxes(oldPositions);
 
         // After boxes settle, redraw arrows at final positions and fade in
-        setTimeout(() => {
+        pendingTimeout = setTimeout(() => {
+          pendingTimeout = null;
+          activeAnimations = [];
           drawArrows(el, connections);
           if (svg) {
             svg.style.opacity = "1";
           }
+          // Update snapshot to final settled positions
           boxSnapshot = snapshotBoxPositions();
         }, FLIP_DURATION);
       });

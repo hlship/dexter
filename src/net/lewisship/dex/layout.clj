@@ -117,14 +117,20 @@
      :after (max 0 (- total end))}))
 
 (defn- artifact-box
-  "Creates a box descriptor for an artifact."
-  [db artifact-key column row]
-  (let [info (deps/artifact-info db artifact-key)]
+  "Creates a box descriptor for an artifact.
+  hidden-libs is used to determine leaf status — an artifact is a leaf if
+  it has no dependencies after filtering out hidden libs."
+  [db artifact-key column row hidden-libs]
+  (let [info (deps/artifact-info db artifact-key)
+        dep-keys (keys (:deps info))
+        visible-deps (if (seq hidden-libs)
+                       (remove #(contains? hidden-libs %) dep-keys)
+                       dep-keys)]
     {:id (str "box-" artifact-key)
      :key artifact-key
      :name (or (:label info) (str artifact-key))
      :version (:version info)
-     :leaf? (empty? (:deps info))
+     :leaf? (empty? visible-deps)
      :column column
      :row row}))
 
@@ -188,7 +194,7 @@
   - :connections    - vector of connection records between visible artifacts"
   [db selected left-offset right-offset hidden-libs]
   (let [;; Center box
-        selected-box (artifact-box db selected :center 0)
+        selected-box (artifact-box db selected :center 0 hidden-libs)
 
         ;; Hidden libs are filtered out of columns unless they are the selected artifact
         hide? (fn [k] (and (seq hidden-libs)
@@ -208,10 +214,10 @@
 
         ;; Build box descriptors for visible items
         left-boxes (vec (map-indexed
-                         (fn [row k] (artifact-box db k :left row))
+                         (fn [row k] (artifact-box db k :left row hidden-libs))
                          (:items left-window)))
         right-boxes (vec (map-indexed
-                          (fn [row k] (artifact-box db k :right row))
+                          (fn [row k] (artifact-box db k :right row hidden-libs))
                           (:items right-window)))
 
         ;; All visible keys and a lookup map
