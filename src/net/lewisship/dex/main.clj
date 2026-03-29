@@ -1,11 +1,22 @@
 (ns net.lewisship.dex.main
-  (:require [clojure.java.browse :as browse]
-            [clojure.string :as str]
+  (:require [babashka.fs :as fs]
+            [clj-commons.ansi :refer [pout]]
+            [clj-commons.humanize :as h]
+            [clojure.java.browse :as browse]
+            [clojure.string :as string]
+            [net.lewisship.cli-tools :as cli :refer [defcommand abort]]
             [net.lewisship.dex.deps :as deps]
             [net.lewisship.dex.deps-reader :as deps-reader]
-            [net.lewisship.dex.service :as service]))
+            [net.lewisship.dex.service :as service])
+  (:import (java.net ServerSocket)))
 
 (def ^:private default-port 10240)
+
+(defn- free-port
+  []
+  (with-open [s (ServerSocket. 0)]
+    (.getLocalPort s)))
+
 
 (defn- parse-aliases
   "Parses alias arguments into a vector of keywords.
@@ -13,33 +24,95 @@
   [alias-args]
   (into []
         (comp
-         (mapcat #(str/split % #":"))
-         (remove str/blank?)
+          (mapcat #(string/split % #":"))
+          (remove string/blank?)
          (map keyword))
         alias-args))
 
-(defn- deps-edn-file?
-  "Returns true if the path looks like a deps.edn file (as opposed to a
-  pre-built project-deps.edn)."
-  [path]
-  (str/ends-with? path "deps.edn"))
+(def ^:private readers
+  [["deps.edn" deps-reader/read-deps]])
 
-(defn -main
-  [& args]
-  (let [path (or (first args) "test-resources/dex/project-deps.edn")
-        alias-args (rest args)
-        aliases (when (seq alias-args) (parse-aliases alias-args))]
-    (println (str "Loading dependency data from: " path))
-    (if (deps-edn-file? path)
-      (do
-        (when (seq aliases)
-          (println (str "  with aliases: " (str/join ", " (map name aliases)))))
-        (println "  Resolving dependencies (this may take a moment)...")
-        (let [raw-data (deps-reader/read-deps path {:aliases aliases})]
-          (reset! deps/*db (deps/build-db raw-data))))
-      (deps/load-db! path))
-    (println (str "Loaded " (count (deps/artifact-keys @deps/*db)) " artifacts"))
-    (service/start!)
-    (let [url (str "http://localhost:" default-port)]
-      (println (str "Server started at " url))
-      (browse/browse-url url))))
+(defn- read-dependency-data
+  [path aliases]
+  (if (fs/directory? path)
+    (some (fn [[file-name reader]]
+            (let [file (fs/file path file-name)]
+              (when (fs/exists? file)
+                (reader file {:aliases aliases}))))
+          readers)
+    (let [target-file (fs/file-name path)]
+      (some (fn [[file-name reader]]
+              (when (= file-name target-file)
+                (when (fs/exists? path)
+                  (reader path {:aliases aliases}))))
+            readers))))
+
+(defcommand -main
+  "Dexter is used to explore the dependency graph of a Clojure (or JVM) based project.
+  The dependencies, relationships, and versions are analyzed and a browser is launched
+  to allow interactive exploration of the dependency hierarchy.
+  
+  Normally, will find the correct dependency file (deps.edn, project.clj, etc.) in the
+  current directory, though the --file option can override this."
+  [port ["-p" "--port NUMBER" "Port to use for web server"
+         :parse-fn parse-long
+         :validate [some? "Not a number"
+                    #(<= 1000 %) "Must be at least 1000"]]
+   file ["-f" "--file PATH" "Dependency file to read"]
+   aliases ["-a" "--alias NAME" "Add an alias (also known as a profile) used when resolving dependencies"
+            :multi true
+            :update-fn (fnil conj [])]
+   no-open? ["-O" "--no-open" "Do not automatically open a browser"]
+   :command "dexter"]
+  (let [port' (or port (free-port))
+        path  (-> (or file ".") fs/absolutize fs/normalize)
+        data  (read-dependency-data path aliases)
+        url   (str "http://localhost:" port')]
+    ;; TODO: Update oxford to override "and" to "or"
+    (when-not data
+      (abort [:yellow
+              "No project file found in " [:bold path]
+              ", expecting one of: "
+              (h/oxford
+                (->> readers
+                     (map first)
+                     sort)
+                :maximum-display 100)]))
+    (pout [:faint "Running web server at "] [:bold url] " ...")
+    ;; TODO: As an argument to start! not this funky mess
+    (reset! deps/*db (deps/build-db data))
+    (service/start! {:port port'})
+    (pout "Hit " [:bold "Ctrl+C"] " when done")
+    (when-not no-open?
+      (browse/browse-url url))
+    ;; Hang forever (until ^C)
+    @(promise)))
+
+
+(comment
+  (cli/set-prevent-exit! true)
+  (-main)
+  (-main "-adev")
+  (-main "-f..")
+
+  (-> ".." fs/absolutize fs/normalize)
+
+
+  ;; Load from pre-built test data
+  (deps/load-db! "test-resources/dex/project-deps.edn")
+
+  ;; Or resolve live from a deps.edn (this project as an example)
+  (let [raw-data (deps-reader/read-deps (fs/file "deps.edn") {:aliases ["dev" "test"]})]
+    (reset! deps/*db (deps/build-db raw-data)))
+
+  (service/start! nil)
+
+  (service/stop!)
+
+  (do
+    ((requiring-resolve 'clj-reload.core/reload))
+    (service/stop!)
+    (service/start! nil))
+
+  ;;
+  )

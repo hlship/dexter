@@ -4,11 +4,15 @@
  :deps
  {org.clojure/clojure                          {:mvn/version "1.12.4"}
   org.clojure/tools.deps                       {:mvn/version "0.29.1598"}
-  org.clj-commons/pretty                       {:mvn/version "3.6.8"}
+  io.github.hlship/cli-tools                   {:mvn/version "0.16.0-beta-5"}
+  babashka/process                             {:mvn/version "0.6.25"}
+  babashka/fs                                  {:mvn/version "0.5.31"}
+  org.clj-commons/humanize                     {:mvn/version "1.1"}
   dynamic-alpha/hyper                          {:git/url "https://github.com/dynamic-alpha/hyper"
                                                 :git/sha "cbd8e757a3c96eb1e080b38c108514bac8357da6"}
-  com.aayushatharva.brotli4j/native-osx-x86_64 {:mvn/version "1.18.0"}
-  version-clj/version-clj                      {:mvn/version "2.0.3"}}
+  com.aayushatharva.brotli4j/native-osx-x86_64 {:mvn/version "1.20.0"}
+  version-clj/version-clj                      {:mvn/version "2.0.3"}
+  org.slf4j/slf4j-nop                          {:mvn/version "2.0.17"}}
 
  :aliases
  {:dev  {:extra-paths ["dev"
@@ -23,5 +27,5 @@
          :main-opts   ["-m" "cognitect.test-runner"]
          :exec-fn     cognitect.test-runner.api/test}
 
-  :run  {:extra-paths ["test-resources"]
-         :main-opts   ["-m" "net.lewisship.dex.main"]}}}
+  :run  {:main-opts ["-m" "net.lewisship.dex.main"]
+         :jvm-opts  ["--enable-native-access=ALL-UNNAMED"]}}}

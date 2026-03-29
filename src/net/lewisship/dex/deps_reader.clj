@@ -8,8 +8,10 @@
   - The special key ROOT represents the project itself
   - artifact-info has :version (string), optional :label, optional :deps
   - :deps is {artifact-key -> {:version requested-version-string}}"
-  (:require [clojure.tools.deps :as td]
-            [clojure.tools.deps.tree :as tree]))
+  (:require [babashka.fs :as fs]
+            [clojure.tools.deps :as td]
+            [clojure.tools.deps.tree :as tree])
+  (:import (java.io File)))
 
 (defn- coord->version
   "Extracts a version string from a tools.deps coordinate map.
@@ -70,23 +72,27 @@
       (seq project-label) (assoc :label project-label)
       (seq root-deps) (assoc :deps root-deps))))
 
+(defn- expand-path
+  [path]
+  (-> path fs/absolutize str))
+
 (defn read-deps
   "Reads a deps.edn file, resolves its transitive dependencies, and returns
   a raw data map suitable for passing to deps/build-db.
 
   Options:
-  - :aliases - collection of alias keywords to include in resolution
+  - :aliases - collection of alias strings to include in resolution
   - :label   - display label for the ROOT entry (defaults to directory name)"
-  [deps-edn-path {:keys [aliases label]}]
-  (let [deps-file (.getAbsoluteFile (java.io.File. (str deps-edn-path)))
-        project-dir (.getParentFile deps-file)
+  [^File deps-edn-path {:keys [aliases label]}]
+  (let [deps-file     (fs/absolutize deps-edn-path)
+        project-dir   (fs/parent deps-file)
         project-label (or label
                           (when project-dir
-                            (.getName project-dir)))
-        opts (cond-> {:project (str deps-file)
+                            (fs/file-name project-dir)))
+        opts          (cond-> {:project (str deps-file)
                       :user nil
-                      :dir (str project-dir)}
-               (seq aliases) (assoc :aliases (vec aliases)))
+                               :dir     (str project-dir)}
+                        (seq aliases) (assoc :aliases (mapv keyword aliases)))
         ;; Get the trace for tree structure
         trace (tree/calc-trace opts)
         dep-tree (tree/trace->tree trace)

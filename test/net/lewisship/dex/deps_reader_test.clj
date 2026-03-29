@@ -42,8 +42,8 @@
 
 (deftest read-deps-with-aliases
   (testing "resolving with :dev alias includes extra deps"
-    (let [raw-data (deps-reader/read-deps test-deps-path {:aliases [:dev]})
-          db (deps/build-db raw-data)]
+    (let [raw-data (deps-reader/read-deps test-deps-path {:aliases ["dev"]})
+          db       (deps/build-db raw-data)]
 
       (testing ":dev alias deps are present as artifacts"
         (is (some? (deps/artifact-info db 'io.github.hlship/trace))

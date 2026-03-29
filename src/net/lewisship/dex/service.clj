@@ -25,12 +25,12 @@
 (defonce *app (atom nil))
 
 (defn start!
-  []
+  [{:keys [port]}]
   (if @*app
     :already-running
     (do
       (reset! *app
-              (h/start! handler {:port 10240}))
+              (h/start! handler {:port (or port 10240)}))
       :started)))
 
 (defn stop!
@@ -41,26 +41,3 @@
       (reset! *app nil)
       :stopped)
     :not-running))
-
-(comment
-
-  ;; Load from pre-built test data
-  (deps/load-db! "test-resources/dex/project-deps.edn")
-
-  ;; Or resolve live from a deps.edn (this project as an example)
-  (do
-    (require '[net.lewisship.dex.deps-reader :as deps-reader])
-    (let [raw-data (deps-reader/read-deps "deps.edn" {:aliases [:dev :test]})]
-      (reset! deps/*db (deps/build-db raw-data))))
-
-  (start!)
-
-  (stop!)
-
-  (do
-    ((requiring-resolve 'clj-reload.core/reload))
-    (stop!)
-    (start!))
-
-  ;;
-  )
