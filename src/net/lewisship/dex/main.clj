@@ -7,6 +7,7 @@
             [net.lewisship.cli-tools :as cli :refer [defcommand abort]]
             [net.lewisship.dex.deps :as deps]
             [net.lewisship.dex.deps-reader :as deps-reader]
+            [net.lewisship.dex.lein-reader :as lein-reader]
             [net.lewisship.dex.service :as service])
   (:import (java.net ServerSocket)))
 
@@ -30,7 +31,8 @@
         alias-args))
 
 (def ^:private readers
-  [["deps.edn" deps-reader/read-deps]])
+  [["deps.edn" deps-reader/read-deps]
+   ["project.clj" lein-reader/read-deps]])
 
 (defn- read-dependency-data
   [path aliases]
