@@ -85,8 +85,8 @@
 ;; --- Page Rendering ---
 
 (defn- render-toolbar
-  "Renders the top toolbar with navigation controls."
-  [cursor selected]
+  "Renders the top toolbar with navigation controls and artifact search."
+  [cursor selected db]
   [:div {:class "bg-white border-b border-slate-200 shadow-sm px-4 py-2 flex items-center gap-4 shrink-0"}
    ;; Home button
    [:button {:class (str "p-2 rounded-lg transition-colors "
@@ -94,6 +94,7 @@
                            "text-slate-300 cursor-default"
                            "text-slate-600 hover:bg-slate-100 hover:text-blue-600"))
              :title "Go to root"
+             :data-accel "h"
              :data-on:click (h/action
                              (swap! cursor assoc
                                     :selected 'ROOT
@@ -106,7 +107,47 @@
              :d "M9.293 2.293a1 1 0 011.414 0l7 7A1 1 0 0117 11h-1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-3a1 1 0 00-1-1H9a1 1 0 00-1 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-6H3a1 1 0 01-.707-1.707l7-7z"}]]]
    ;; Current selection label
    [:span {:class "text-sm text-slate-500"}
-    (str selected)]])
+    (str selected)]
+   ;; Spacer
+   [:div {:class "flex-1"}]
+   ;; Artifact search
+   (let [search (h/tab-cursor :search "")]
+     [:div {:class "relative"}
+      [:input {:id "artifact-search"
+               :class "w-64 px-3 py-1.5 text-sm border border-slate-300 rounded-lg
+                       focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400"
+               :type "text"
+               :placeholder "Search artifact..."
+               :data-accel "f"
+               :list "artifact-list"
+               :value @search
+               ;; Idiomorph preserves focused input values, so we need both:
+               ;; - server-side reset! to keep cursor state clean
+               ;; - client-side el.value/blur to clear the visible input immediately
+               :data-on:change (str (h/action
+                                     (let [v (symbol $value)]
+                                       (when (deps/artifact-info @deps/*db v)
+                                         (swap! cursor assoc
+                                                :selected v
+                                                :left-offset 0
+                                                :right-offset 0))
+                                       (reset! search "")))
+                                    "; el.value = ''; el.blur()")
+               ;; Enter: find first substring match and navigate to it
+               :data-on:keydown
+               (str "if (evt.key !== 'Enter') return; evt.preventDefault(); "
+                    (h/action
+                     (when-let [found (deps/find-artifact @deps/*db $value)]
+                       (swap! cursor assoc
+                              :selected found
+                              :left-offset 0
+                              :right-offset 0))
+                     (reset! search ""))
+                    "; el.value = ''; el.blur()")}]
+      ;; Datalist provides browser-native autocomplete
+      [:datalist {:id "artifact-list"}
+       (for [k (sort (deps/artifact-keys db))]
+         [:option {:value (str k)}])]])])
 
 (defn home-page [_]
   (let [db @deps/*db
@@ -119,7 +160,7 @@
     ;; Full-viewport flex column: toolbar on top, content fills the rest
     [:div {:class "h-screen flex flex-col bg-slate-100"}
      ;; Toolbar (shrink-0 keeps it at natural size)
-     (render-toolbar cursor selected)
+     (render-toolbar cursor selected db)
 
      ;; Content area fills remaining space, centers the graph
      ;; data-draw-arrows passes connection JSON to the client-side arrow plugin

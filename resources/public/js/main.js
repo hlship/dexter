@@ -340,4 +340,48 @@ attribute({
   },
 });
 
+    /**
+ * Datastar plugin: data-accel
+ *
+ * Declares a keyboard accelerator (Cmd on Mac, Ctrl on Windows/Linux) that
+ * triggers a click on the element. The key character comes from the attribute
+ * key, and the __shift modifier requires Shift to be held.
+ *
+ * Suppressed when a modal is open or the element has the disabled attribute.
+ *
+ * Usage in Hiccup:
+ *   :data-accel "s"           ;; Cmd/Ctrl+S triggers el.click()
+ *   :data-accel "z"           ;; Cmd/Ctrl+Z
+ *   :data-accel__shift "z"    ;; Cmd/Ctrl+Shift+Z
+ */
+const isMac = navigator.platform.startsWith('Mac') || navigator.userAgent.includes('Mac');
+const modSymbol = isMac ? '⌘' : 'Ctrl+';
+
+attribute({
+  name: 'accel',
+  requirement: { key: 'denied', value: 'must' },
+  apply({ el, value, mods }) {
+    const accelKey = value;
+    const needsShift = mods.has('shift');
+
+    const handler = (e) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (e.key !== accelKey) return;
+      if (!!e.shiftKey !== needsShift) return;
+      if (el.hasAttribute('disabled')) return;
+      if (document.querySelector('#modal-container > *')) return;
+      e.preventDefault();
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+        el.focus();
+        el.select();
+      } else {
+        el.click();
+      }
+    };
+
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
+  }
+});
+
 console.log("DEX Frontend Loaded");

@@ -9,7 +9,8 @@
   This namespace builds an indexed database that supports fast lookup of both
   dependencies and reverse dependencies (dependants) for any artifact."
   (:require [clojure.edn :as edn]
-            [clojure.java.io :as io]))
+            [clojure.java.io :as io]
+            [clojure.string :as string]))
 
 (defn- build-dependants-index
   "Builds a map of {artifact-key -> [{:from artifact-key :requested-version string}]}
@@ -46,6 +47,23 @@
   "Returns the artifact info for the given key, or nil if not found."
   [db artifact-key]
   (get-in db [:artifacts artifact-key]))
+
+(defn find-artifact
+  "Finds the first artifact key matching the search text.
+  Tries exact match first, then case-insensitive substring match.
+  Returns the artifact key (symbol) or nil."
+  [db text]
+  (when (and text (seq text))
+    (let [text (str text)
+          exact (symbol text)]
+      (if (artifact-info db exact)
+        exact
+        (let [lower (string/lower-case text)]
+          (->> (sort (artifact-keys db))
+               (filter #(string/includes?
+                         (string/lower-case (str %))
+                         lower))
+               first))))))
 
 (defn dependencies
   "Returns a vector of connection maps for the direct dependencies of the given artifact.
