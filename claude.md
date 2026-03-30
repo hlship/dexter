@@ -4,7 +4,7 @@
 
 - **Never commit without explicit approval.** After making changes, describe what was done and let the user verify before committing. Only commit when the user says "commit".
 
-Interactive browser-based tool for exploring JVM dependency graphs. Resolves dependencies from `deps.edn` (via tools.deps) or `project.clj` (via `lein deps :tree-data`), then renders a three-column graph with navigable artifact boxes and SVG connection arrows.
+Interactive browser-based tool for exploring JVM dependency graphs. Resolves dependencies from `deps.edn` (via tools.deps) or `project.clj` (via leiningen-core APIs), then renders a three-column graph with navigable artifact boxes and SVG connection arrows.
 
 ## Architecture
 
@@ -20,7 +20,7 @@ Interactive browser-based tool for exploring JVM dependency graphs. Resolves dep
 |---|---|
 | `dex.deps` | Core data model — `build-db` indexes artifacts with labels, dependants, and label search index |
 | `dex.deps-reader` | Reads `deps.edn` via `tools.deps`, walks trace tree to produce flat artifact map |
-| `dex.lein-reader` | Reads `project.clj` via `lein deps :tree-data` subprocess, parses nested tree |
+| `dex.lein-reader` | Reads `project.clj` via leiningen-core APIs, resolves per-artifact deps via Aether |
 | `dex.layout` | Computes three-column layout: windowed columns, connection graph, version match colors, box annotations |
 | `dex.views` | Hiccup rendering — toolbar, columns, boxes, search, arrow connection JSON |
 | `dex.service` | HTTP lifecycle — routes, Hyper handler, `start!`/`stop!` |
@@ -79,3 +79,20 @@ bb test
 
 - **⌘F** / **Ctrl+F** — Focus artifact search field
 - **⌘H** / **Ctrl+H** — Navigate to root node
+
+## Future Work
+
+### Leiningen plugin for dependency collection
+
+The current lein-reader uses leiningen-core APIs in-process (project/read, classpath/get-dependencies) and performs per-artifact Aether resolution to discover immediate children (since Aether's hierarchy tree prunes already-resolved subtrees). This works but has two drawbacks:
+
+1. **Per-artifact resolution is slow** — each of the N resolved artifacts requires a separate Aether call.
+2. **Plugin/middleware compatibility** — leiningen-core's `project/read` calls `init-project` which loads plugins and applies middleware (e.g., `managed-dependencies`, `plug-n-play`). This works for most projects but can fail when plugins require private Maven repos or have classloader assumptions that don't hold when leiningen-core runs embedded in a different host application.
+
+A more robust approach: create a small **Leiningen plugin** (a jar on the classpath or injected via `:plugins`) that dex launches as a subprocess via `lein`. The plugin would:
+
+1. Run inside a normal `lein` invocation, so all project middleware (managed-dependencies, etc.) has already been applied to the project map.
+2. Use the vizdeps approach: call `classpath/get-dependencies` for the whole project to get the resolved version map, then call it per-artifact to discover each artifact's true immediate children.
+3. Write the flat artifact map as EDN to stdout (or a temp file).
+
+Dex would then launch `lein run-plugin` (or similar) as a subprocess, read the EDN output, and pass it to `deps/build-db` as usual. This cleanly separates Leiningen's classloader world from dex's, and guarantees that all plugins and middleware run in their expected environment.
