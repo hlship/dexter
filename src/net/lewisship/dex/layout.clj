@@ -128,7 +128,7 @@
                        dep-keys)]
     {:id (str "box-" artifact-key)
      :key artifact-key
-     :name (or (:label info) (str artifact-key))
+     :name (:label info)
      :version (:version info)
      :leaf? (empty? visible-deps)
      :column column

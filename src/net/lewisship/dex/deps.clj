@@ -31,12 +31,29 @@
 (defn build-db
   "Builds an indexed dependency database from raw EDN data.
 
+  Ensures every artifact has a :label (defaults to the string form of the key).
+  Builds a label index for fast search.
+
   Returns a map with:
-  - :artifacts     - the raw artifact map {key -> {:version :label :deps}}
-  - :dependants    - reverse index {key -> [{:from key :requested-version v}]}"
+  - :artifacts     - {key -> {:version :label :deps ...}} with :label guaranteed
+  - :dependants    - reverse index {key -> [{:from key :requested-version v}]}
+  - :by-label      - {lowercase-label -> key} for search"
   [raw-data]
-  {:artifacts raw-data
-   :dependants (build-dependants-index raw-data)})
+  (let [;; Ensure every artifact has a :label
+        artifacts (reduce-kv
+                   (fn [m k info]
+                     (assoc m k (update info :label #(or % (str k)))))
+                   {}
+                   raw-data)
+        ;; Build label index: lowercase label -> artifact key
+        by-label (reduce-kv
+                  (fn [m k {:keys [label]}]
+                    (assoc m (string/lower-case label) k))
+                  {}
+                  artifacts)]
+    {:artifacts artifacts
+     :dependants (build-dependants-index raw-data)
+     :by-label by-label}))
 
 (defn artifact-keys
   "Returns all artifact keys in the database."
@@ -50,20 +67,18 @@
 
 (defn find-artifact
   "Finds the first artifact key matching the search text.
-  Tries exact match first, then case-insensitive substring match.
-  Returns the artifact key (symbol) or nil."
+  Tries exact label match first, then case-insensitive substring match
+  against labels. Returns the artifact key (symbol) or nil."
   [db text]
   (when (and text (seq text))
-    (let [text (str text)
-          exact (symbol text)]
-      (if (artifact-info db exact)
-        exact
-        (let [lower (string/lower-case text)]
-          (->> (sort (artifact-keys db))
-               (filter #(string/includes?
-                         (string/lower-case (str %))
-                         lower))
-               first))))))
+    (let [lower (string/lower-case (str text))]
+      ;; Exact label match
+      (or (get-in db [:by-label lower])
+          ;; Substring match against labels (sorted for deterministic results)
+          (->> (:by-label db)
+               (some (fn [[label k]]
+                       (when (string/includes? label lower)
+                         k))))))))
 
 (defn dependencies
   "Returns a vector of connection maps for the direct dependencies of the given artifact.

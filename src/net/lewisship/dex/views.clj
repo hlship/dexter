@@ -107,7 +107,7 @@
              :d "M9.293 2.293a1 1 0 011.414 0l7 7A1 1 0 0117 11h-1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-3a1 1 0 00-1-1H9a1 1 0 00-1 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-6H3a1 1 0 01-.707-1.707l7-7z"}]]]
    ;; Current selection label
    [:span {:class "text-sm text-slate-500"}
-    (str selected)]
+    (:label (deps/artifact-info db selected))]
    ;; Spacer
    [:div {:class "flex-1"}]
    ;; Artifact search
@@ -125,13 +125,12 @@
                ;; - server-side reset! to keep cursor state clean
                ;; - client-side el.value/blur to clear the visible input immediately
                :data-on:change (str (h/action
-                                     (let [v (symbol $value)]
-                                       (when (deps/artifact-info @deps/*db v)
-                                         (swap! cursor assoc
-                                                :selected v
-                                                :left-offset 0
-                                                :right-offset 0))
-                                       (reset! search "")))
+                                     (when-let [k (deps/find-artifact @deps/*db $value)]
+                                       (swap! cursor assoc
+                                              :selected k
+                                              :left-offset 0
+                                              :right-offset 0))
+                                     (reset! search ""))
                                     "; el.value = ''; el.blur()")
                ;; Enter: find first substring match and navigate to it
                :data-on:keydown
@@ -144,10 +143,11 @@
                               :right-offset 0))
                      (reset! search ""))
                     "; el.value = ''; el.blur()")}]
-      ;; Datalist provides browser-native autocomplete
+      ;; Datalist provides browser-native autocomplete using artifact labels
       [:datalist {:id "artifact-list"}
-       (for [k (sort (deps/artifact-keys db))]
-         [:option {:value (str k)}])]])])
+       (for [k (sort (deps/artifact-keys db))
+             :let [label (:label (deps/artifact-info db k))]]
+         [:option {:value label}])]])])
 
 (defn home-page [_]
   (let [db @deps/*db
