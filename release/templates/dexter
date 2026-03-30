@@ -1,0 +1,23 @@
+#!/bin/bash
+set -euo pipefail
+
+# Resolve symlinks to find the actual script location
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+  SCRIPT_DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  # If SOURCE is relative, resolve it relative to the symlink's directory
+  [[ "$SOURCE" != /* ]] && SOURCE="$SCRIPT_DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+
+UBER_JAR="$SCRIPT_DIR/{{uber-jar}}"
+
+if [ ! -f "$UBER_JAR" ]; then
+  echo "Error: dexter jar not found at $UBER_JAR" >&2
+  exit 1
+fi
+
+exec java --enable-native-access=ALL-UNNAMED \
+  --class-path "$UBER_JAR" \
+  clojure.main -m net.lewisship.dex.main "$@"

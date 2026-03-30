@@ -1,4 +1,35 @@
-{:tasks
- {:requires [[babashka.process :as p]]
+{:paths ["release"]
+ :deps  {babashka/process       {:mvn/version "0.6.25"}
+         babashka/fs            {:mvn/version "0.5.31"}
+         org.clj-commons/pretty {:mvn/version "3.6.8"}}
+ :tasks
+ {:requires ([babashka.process :as p]
+             [dexter.release :as r :refer [sh]])
   test      (p/shell "clojure -M:test")
-  tailwind  (p/shell "tailwindcss -i public/style.css -o generated-resources/public/style.css --watch")}}
+  tailwind  (p/shell "tailwindcss -i public/style.css -o generated-resources/public/style.css --watch")
+  package   (r/package "test")
+  release   (let [tag (sh {:out :string} "git describe --tags --abbrev=0")
+                  zip-file (r/package tag)
+                  sha (r/sha256 zip-file)
+                  create-opts (cond-> ["--verify-tag" "--generate-notes"]
+                                (string/includes? tag "alpha")
+                                (conj "--prerelease"))
+                  formula (-> zip-file fs/parent (fs/file "dexter.rb"))]
+              (apply sh "gh release create" tag create-opts)
+              (sh "gh release upload --clobber" tag zip-file)
+              (println)
+              (pout "Release URL: "
+                [:bold
+                 "https://github.com/hlship/dexter/releases/tag/" tag])
+              (pout "  Asset URL: "
+                [:bold "https://github.com/hlship/dexter/releases/download/"
+                 tag "/" (fs/file-name zip-file)])
+              (pout "     SHA256: " [:bold sha])
+              (r/render-template "templates/dexter.rb"
+                formula
+                {:tag      tag
+                 :sha      sha
+                 :uber-jar (str "dexter-" tag ".jar")
+                 :zip-name (fs/file-name zip-file)})
+              (println)
+              (pout "Wrote formula to " [:bold formula]))}}
