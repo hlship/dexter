@@ -21,3 +21,6 @@ pom.xml.asc
 /.calva/output-window/output.calva-repl
 /generated-resources/
 /out/
+
+.clj-kondo/*
+!/.clj-kondo/config.edn

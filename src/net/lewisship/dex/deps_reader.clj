@@ -72,9 +72,6 @@
       (seq project-label) (assoc :label project-label)
       (seq root-deps) (assoc :deps root-deps))))
 
-(defn- expand-path
-  [path]
-  (-> path fs/absolutize str))
 
 (defn read-deps
   "Reads a deps.edn file, resolves its transitive dependencies, and returns

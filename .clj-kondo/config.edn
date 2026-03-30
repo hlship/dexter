@@ -1,0 +1,5 @@
+{:config-in-ns
+ {net.lewisship.dex.views
+  ;; Hyper client params ($value, $key, etc.) are injected by the h/action macro
+  ;; and appear as unresolved symbols to static analysis.
+  {:linters {:unresolved-symbol {:level :off}}}}}

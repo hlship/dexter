@@ -2,7 +2,6 @@
   "HTTP server lifecycle: routes, handler, start/stop."
   (:require [cheshire.core :as json]
             [hyper.core :as h]
-            [net.lewisship.dex.deps :as deps]
             [net.lewisship.dex.views :as views]))
 
 ;; --- Routes & Handler ---

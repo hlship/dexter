@@ -9,6 +9,13 @@
              [clj-commons.ansi :refer [pout]]
              [dexter.release :as r :refer [sh]])
   test      (p/shell "clojure -M:test")
+  lint      (do
+              ;; First pass: analyze dependencies to populate .clj-kondo cache
+              (p/shell {:continue true}
+                       "clj-kondo --copy-configs --dependencies --lint"
+                       (-> (p/shell {:out :string} "clojure -A:dev:test -Spath") :out string/trim))
+              ;; Second pass: lint project sources using cached dependency info
+              (p/shell "clj-kondo --lint src test dev"))
   tailwind  (p/shell "tailwindcss -i public/style.css -o generated-resources/public/style.css --watch")
   package   (r/package "test")
   release   (let [tag (sh {:out :string} "git describe --tags --abbrev=0")
