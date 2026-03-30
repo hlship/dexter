@@ -1,5 +1,9 @@
 # DEX — Dependency Explorer
 
+## Workflow Rules
+
+- **Never commit without explicit approval.** After making changes, describe what was done and let the user verify before committing. Only commit when the user says "commit".
+
 Interactive browser-based tool for exploring JVM dependency graphs. Resolves dependencies from `deps.edn` (via tools.deps) or `project.clj` (via `lein deps :tree-data`), then renders a three-column graph with navigable artifact boxes and SVG connection arrows.
 
 ## Architecture
