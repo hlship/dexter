@@ -25,8 +25,9 @@
   (let [raw-data (deps-reader/read-deps (fs/file "deps.edn") {:aliases ["dev" "test"]})]
     (reset! deps/*db (deps/build-db raw-data)))
 
-  (-> (lein-reader/read-deps (fs/file "../../nubank/common-core/project.clj") nil)
-      deps/build-db)
+  (reset! deps/*db
+          (-> (lein-reader/read-deps (fs/file "../../nubank/balatro/project.clj") nil)
+              deps/build-db))
 
   ;; --- Server lifecycle ---
 
