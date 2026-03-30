@@ -1,23 +1,16 @@
 (ns net.lewisship.dex.main
   (:require [babashka.fs :as fs]
-            [clj-commons.ansi :refer [pout]]
+            [clj-commons.ansi :refer [pout perr]]
             [clj-commons.humanize :as h]
-            [clojure.java.browse :as browse]
             [clojure.string :as string]
             [net.lewisship.cli-tools :as cli :refer [defcommand abort]]
-            [net.lewisship.dex.deps :as deps]
-            [net.lewisship.dex.deps-reader :as deps-reader]
-            [net.lewisship.dex.lein-reader :as lein-reader]
-            [net.lewisship.dex.service :as service])
+            [net.lewisship.dex.deps :as deps])
   (:import (java.net ServerSocket)))
-
-(def ^:private default-port 10240)
 
 (defn- free-port
   []
   (with-open [s (ServerSocket. 0)]
     (.getLocalPort s)))
-
 
 (defn- parse-aliases
   "Parses alias arguments into a vector of keywords.
@@ -31,22 +24,25 @@
         alias-args))
 
 (def ^:private readers
-  [["deps.edn" deps-reader/read-deps]
-   ["project.clj" lein-reader/read-deps]])
+  [["deps.edn" 'net.lewisship.dex.deps-reader/deps-reader]
+   ["project.clj" 'net.lewisship.dex.lein-reader/lein-reader]])
+
+(defn- invoke [reader-sym file opts]
+  (when (fs/exists? file)
+    (perr [:faint "Reading " file " ..."])
+    ((requiring-resolve reader-sym) file opts)))
 
 (defn- read-dependency-data
-  [path aliases]
+  [path opts]
   (if (fs/directory? path)
     (some (fn [[file-name reader]]
             (let [file (fs/file path file-name)]
-              (when (fs/exists? file)
-                (reader file {:aliases aliases}))))
+              (invoke reader file opts)))
           readers)
     (let [target-file (fs/file-name path)]
       (some (fn [[file-name reader]]
               (when (= file-name target-file)
-                (when (fs/exists? path)
-                  (reader path {:aliases aliases}))))
+                (invoke reader path opts)))
             readers))))
 
 (defcommand -main
@@ -68,7 +64,7 @@
    :command "dexter"]
   (let [port' (or port (free-port))
         path  (-> (or file ".") fs/absolutize fs/normalize)
-        data  (read-dependency-data path aliases)
+        data  (read-dependency-data path {:aliases aliases})
         url   (str "http://localhost:" port')]
     ;; TODO: Update oxford to override "and" to "or"
     (when-not data
@@ -83,10 +79,10 @@
     (pout [:faint "Running web server at "] [:bold url] " ...")
     ;; TODO: As an argument to start! not this funky mess
     (reset! deps/*db (deps/build-db data))
-    (service/start! {:port port'})
+    ((requiring-resolve 'net.lewisship.dex.service/start!) {:port port'})
     (pout "Hit " [:bold "Ctrl+C"] " when done")
     (when-not no-open?
-      (browse/browse-url url))
+      ((requiring-resolve 'clojure.java.browse/browse-url) url))
     ;; Hang forever (until ^C)
     @(promise)))
 
@@ -99,19 +95,21 @@
 
   (-> ".." fs/absolutize fs/normalize)
 
-
   ;; Load from pre-built test data
   (deps/load-db! "test-resources/dex/project-deps.edn")
 
   ;; Or resolve live from a deps.edn (this project as an example)
-  (let [raw-data (deps-reader/read-deps (fs/file "deps.edn") {:aliases ["dev" "test"]})]
-    (reset! deps/*db (deps/build-db raw-data)))
-
+  (do
+    (require [net.lewisship.dex.deps-reader :as deps-reader])
+    (let [raw-data (deps-reader/read-deps (fs/file "deps.edn") {:aliases ["dev" "test"]})]
+      (reset! deps/*db (deps/build-db raw-data))))
+  
   (service/start! nil)
 
   (service/stop!)
 
   (do
+    (require [net.lewisship.dex.service :as service])
     ((requiring-resolve 'clj-reload.core/reload))
     (service/stop!)
     (service/start! nil))

@@ -11,7 +11,12 @@
                               "resources"]
                  :target-dir class-dir})
     (b/compile-clj {:basis      basis
-                    :ns-compile '[net.lewisship.dex.main]
+                    :ns-compile '[net.lewisship.dex.main
+                                  ;; main uses requiring-resolve on these:
+                                  net.lewisship.dex.service
+                                  net.lewisship.dex.deps-reader
+                                  net.lewisship.dex.lein-reader
+                                  clojure.java.browse]
                     :class-dir  class-dir})
     (b/uber {:class-dir class-dir
              :uber-file uber-file
