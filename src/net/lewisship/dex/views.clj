@@ -154,9 +154,10 @@
         cursor (h/tab-cursor :view {:selected 'ROOT
                                     :left-offset 0
                                     :right-offset 0
-                                    :hidden-libs layout/default-hidden-libs})
-        {:keys [selected left-offset right-offset hidden-libs]} @cursor
-        layout-data (layout/compute-layout db selected left-offset right-offset hidden-libs)]
+                                    :hidden-libs layout/default-hidden-libs
+                                    :max-visible nil})
+        {:keys [selected left-offset right-offset hidden-libs max-visible]} @cursor
+        layout-data (layout/compute-layout db selected left-offset right-offset hidden-libs max-visible)]
     ;; Full-viewport flex column: toolbar on top, content fills the rest
     [:div {:class "h-screen flex flex-col bg-slate-100"}
      ;; Toolbar (shrink-0 keeps it at natural size)
@@ -167,12 +168,17 @@
      [:div {:id "dep-viewer"
             :class "flex-1 relative flex justify-center gap-[120px] overflow-auto"
             :data-draw-arrows (connections->json (:connections layout-data)
-                                                  (:id (:selected-box layout-data)))}
+                                                  (:id (:selected-box layout-data)))
+            :data-track-height "true"
+            :data-on:change__debounce.300ms
+            (h/action
+             (when-let [mv (some-> $value not-empty parse-long)]
+               (when (and (pos? mv) (not= mv (:max-visible @cursor)))
+                 (swap! cursor assoc :max-visible mv))))}
 
       ;; Empty SVG container — client-side JS populates arrow paths
       [:svg {:id "arrow-overlay"
              :class "absolute inset-0 pointer-events-none"
-
              :width "100%"
              :height "100%"
              :xmlns "http://www.w3.org/2000/svg"}]

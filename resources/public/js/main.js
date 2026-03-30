@@ -340,7 +340,51 @@ attribute({
   },
 });
 
-    /**
+/**
+ * Datastar plugin: data-track-height
+ *
+ * Observes the element's height via ResizeObserver and computes the maximum
+ * number of artifact boxes that fit. When the count changes, sets el.value
+ * and dispatches a 'change' event so that a data-on:change handler can
+ * send the new max-visible to the server.
+ *
+ * Box dimensions must stay in sync with Tailwind classes on rendered boxes:
+ *   box height ≈ 56px (px-4 py-2, two text lines, border-2)
+ *   gap = 12px (gap-3)
+ */
+const BOX_SLOT_HEIGHT = 68; // box + gap
+const COLUMN_PADDING = 40;  // vertical padding/margin in column
+
+attribute({
+  name: "track-height",
+  keyReq: "denied",
+  valReq: "must",
+  apply: ({ el }) => {
+    let lastMaxVisible = -1;
+
+    function onResize() {
+      const height = el.clientHeight;
+      const mv = Math.max(1, Math.floor((height - COLUMN_PADDING) / BOX_SLOT_HEIGHT));
+      if (mv !== lastMaxVisible) {
+        lastMaxVisible = mv;
+        el.value = String(mv);
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    }
+
+    // Initial computation (deferred to let layout settle)
+    requestAnimationFrame(onResize);
+
+    const observer = new ResizeObserver(() => {
+      requestAnimationFrame(onResize);
+    });
+    observer.observe(el);
+
+    return () => observer.disconnect();
+  },
+});
+
+/**
  * Datastar plugin: data-accel
  *
  * Declares a keyboard accelerator (Cmd on Mac, Ctrl on Windows/Linux) that

@@ -11,7 +11,7 @@
             [version-clj.core :as ver]))
 
 ;; Maximum number of nodes visible in a single column before windowing kicks in.
-(def ^:const max-visible 8)
+(def ^:const default-max-visible 8)
 
 (def default-hidden-libs
   "Default set of libs to hide from dependency/dependant columns.
@@ -104,11 +104,11 @@
   - :offset      - current offset
   - :before      - count of items above the window
   - :after       - count of items below the window"
-  [items offset]
+  [items offset n]
   (let [all (vec items)
         total (count all)
-        offset (max 0 (min offset (max 0 (- total max-visible))))
-        end (min total (+ offset max-visible))
+        offset (max 0 (min offset (max 0 (- total n))))
+        end (min total (+ offset n))
         visible (subvec all offset end)]
     {:items visible
      :total total
@@ -186,14 +186,17 @@
   - right-offset   - windowing offset for the dependencies column
   - hidden-libs    - set of lib keys to hide from dependency/dependant columns
                      (unless the hidden lib itself is selected)
+  - max-visible    - maximum nodes per column (computed from viewport height)
 
   Returns a map with:
   - :selected-box   - the center box descriptor
   - :left           - windowed dependants column {:items :boxes :total :offset :before :after}
   - :right          - windowed dependencies column {:items :boxes :total :offset :before :after}
   - :connections    - vector of connection records between visible artifacts"
-  [db selected left-offset right-offset hidden-libs]
-  (let [;; Center box
+  [db selected left-offset right-offset hidden-libs max-visible]
+  (let [max-visible (or max-visible default-max-visible)
+
+        ;; Center box
         selected-box (artifact-box db selected :center 0 hidden-libs)
 
         ;; Hidden libs are filtered out of columns unless they are the selected artifact
@@ -209,8 +212,8 @@
         dept-keys (into [] (remove hide?) (mapv :from dept-connections))
 
         ;; Apply windowing
-        left-window (window-items dept-keys left-offset)
-        right-window (window-items dep-keys right-offset)
+        left-window (window-items dept-keys left-offset max-visible)
+        right-window (window-items dep-keys right-offset max-visible)
 
         ;; Build box descriptors for visible items
         left-boxes (vec (map-indexed
