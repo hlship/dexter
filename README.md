@@ -1,8 +1,12 @@
 # Dexter — Dependency Explorer
 
-Dexter is an interactive, browser-based tool for visualizing and exploring the dependency graphs of JVM projects.
+Dexter is an interactive, browser-based tool for visualizing and exploring the artifact dependency graph of JVM projects.
 
-Even trivial applications accumulate dozens—sometimes hundreds—of transitive dependencies, making it impossible to produce a meaningful static graph or to diagnose version conflicts buried deep in the tree. Dexter addresses this by letting you navigate the dependency hierarchy interactively: select any artifact to see what depends on it (dependants) and what it depends on (dependencies), with version mismatches highlighted at a glance.
+Even trivial projects accumulate dozens—sometimes hundreds—of transitive dependencies, making it impossible to produce a meaningful static graph or to easily diagnose version conflicts buried deep in the tree. Dexter addresses this by letting you navigate the dependency hierarchy interactively: select any artifact to see what depends on it (dependants) and what it depends on (dependencies), with version mismatches highlighted at a glance.
+
+![Overview](docs/images/overview.png)
+
+Mousing over a dependency arrow expands it and, for non-exact matches, displays the requested version.
 
 ## Features
 
@@ -28,8 +32,8 @@ Dexter requires Clojure CLI (`clojure`) to be installed. For Leiningen projects,
 
 ```bash
 # Clone the repository
-git clone https://github.com/hlship/dex.git
-cd dex
+git clone https://github.com/hlship/dexter.git
+cd dexter
 ```
 
 ## Usage

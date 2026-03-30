@@ -9,7 +9,7 @@
 
 (def routes
   [["/" {:name :home
-         :title "DEX - Dependency Explorer"
+         :title "Dexter"
          :get #'views/home-page}]])
 
 (def handler (h/create-handler
