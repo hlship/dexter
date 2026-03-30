@@ -48,7 +48,7 @@
   The column fills its parent's height and vertically centers its boxes."
   [{:keys [boxes before after]} column selected-key cursor]
   (let [offset-key (case column :left :left-offset :right :right-offset)]
-    [:div {:class "flex flex-col justify-center gap-3 w-[280px] h-full"}
+    [:div {:class "relative flex flex-col justify-center gap-3 w-[280px] h-full"}
      (render-overflow-indicator
       before :up
       (h/action (swap! cursor update offset-key dec)))
@@ -214,7 +214,7 @@
       (render-column (:left layout-data) :left selected cursor)
 
       ;; Center: selected artifact
-      [:div {:class "flex flex-col justify-center w-[280px] h-full"}
+      [:div {:class "relative flex flex-col justify-center w-[280px] h-full"}
        (render-box (:selected-box layout-data) true
                    (h/action))]
 
