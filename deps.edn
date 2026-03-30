@@ -11,6 +11,8 @@
   dynamic-alpha/hyper                          {:git/url "https://github.com/dynamic-alpha/hyper"
                                                 :git/sha "dd5422ddf0485d7c73bb11eff05452d1149acdfa"}
   version-clj/version-clj                      {:mvn/version "2.0.3"}
+  leiningen-core/leiningen-core                {:mvn/version "2.12.0"
+                                                :exclusions [org.slf4j/slf4j-nop]}
   org.slf4j/slf4j-nop                          {:mvn/version "2.0.17"}}
 
  :aliases

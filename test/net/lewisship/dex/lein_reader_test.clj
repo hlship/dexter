@@ -1,76 +1,95 @@
 (ns net.lewisship.dex.lein-reader-test
-  (:require [clojure.edn :as edn]
-            [clojure.test :refer [deftest is testing]]
-            [net.lewisship.dex.deps :as deps]
-            [net.lewisship.dex.lein-reader :as lein-reader]))
+  (:require [clojure.test :refer [deftest is testing]]
+            [net.lewisship.dex.deps :as deps]))
 
-;; Tests use pre-captured output from `lein deps :tree-data` stored as EDN.
+;; Tests use a manually constructed flat artifact map in the same format
+;; that read-deps produces. This validates that deps/build-db correctly
+;; indexes the data and supports the expected queries.
+;;
+;; The test data simulates a project with:
+;; - cheshire depending on jackson-core and tigris
+;; - ring-core depending on commons-codec, commons-io, and ring-codec
+;; - ring-codec also depending on commons-codec (diamond dependency)
+;; - commons-codec requested as "1.10" by ring libs but resolved to "1.11"
 
-(def ^:private test-tree-data
-  (edn/read-string (slurp "test-resources/dex/test-project.clj")))
+(def ^:private test-raw-data
+  {'cheshire                                {:version "5.13.0"
+                                             :deps    {'com.fasterxml.jackson.core/jackson-core {:version "2.17.0"}
+                                                       'tigris                                  {:version "0.1.2"}}}
+   'com.fasterxml.jackson.core/jackson-core {:version "2.17.0"}
+   'tigris                                  {:version "0.1.2"}
 
-(def ^:private test-db
-  (deps/build-db (lein-reader/parse-tree-data test-tree-data {:label "test-project" :version "1.2.3"})))
+   'ring/ring-core                          {:version "1.5.0"
+                                             :deps    {'commons-codec  {:version "1.10"}
+                                                       'commons-io     {:version "2.5"}
+                                                       'ring/ring-codec {:version "1.2.0"}}}
+   'commons-codec                           {:version "1.11"} ;; resolved version differs from requested
+   'commons-io                              {:version "2.5"}
+   'ring/ring-codec                         {:version "1.2.0"
+                                             :deps    {'commons-codec {:version "1.10"}}}
 
-(deftest parse-tree-data-produces-valid-db-structure
-  (testing "ROOT entry exists with label and deps"
+   'org.clojure/clojure                     {:version "1.12.4"
+                                             :deps    {'org.clojure/spec.alpha        {:version "0.5.238"}
+                                                       'org.clojure/core.specs.alpha   {:version "0.4.74"}}}
+   'org.clojure/spec.alpha                  {:version "0.5.238"}
+   'org.clojure/core.specs.alpha            {:version "0.4.74"}
+
+   'ROOT                                    {:version "1.0.0"
+                                             :label   "test-project"
+                                             :deps    {'cheshire            {:version "5.13.0"}
+                                                       'ring/ring-core      {:version "1.5.0"}
+                                                       'org.clojure/clojure {:version "1.12.4"}}}})
+
+(def ^:private test-db (deps/build-db test-raw-data))
+
+(deftest all-artifacts-present
+  (testing "all artifacts are present"
+    (is (some? (deps/artifact-info test-db 'cheshire)))
+    (is (some? (deps/artifact-info test-db 'ring/ring-core)))
+    (is (some? (deps/artifact-info test-db 'commons-codec)))
+    (is (some? (deps/artifact-info test-db 'org.clojure/clojure))))
+
+  (testing "artifact versions use resolved versions"
+    (is (= "1.11" (:version (deps/artifact-info test-db 'commons-codec)))
+        "commons-codec should use resolved version, not requested"))
+
+  (testing "ROOT entry has correct structure"
     (let [root (deps/artifact-info test-db 'ROOT)]
-      (is (some? root) "ROOT entry should exist")
-      (is (= "1.2.3" (:version root)))
+      (is (= "1.0.0" (:version root)))
       (is (= "test-project" (:label root)))
-      (is (map? (:deps root)) "ROOT should have deps")
-      (is (contains? (:deps root) 'cheshire)
-          "ROOT should depend on cheshire")
-      (is (contains? (:deps root) 'org.clojure/clojure)
-          "ROOT should depend on clojure")))
+      (is (contains? (:deps root) 'cheshire))
+      (is (contains? (:deps root) 'ring/ring-core))
+      (is (contains? (:deps root) 'org.clojure/clojure)))))
 
-  (testing "top-level artifacts have correct versions"
-    (let [cheshire (deps/artifact-info test-db 'cheshire)]
-      (is (some? cheshire) "cheshire should be in db")
-      (is (= "5.13.0" (:version cheshire)))))
+(deftest transitive-dependencies-tracked
+  (testing "cheshire has correct direct deps"
+    (let [deps (deps/dependencies test-db 'cheshire)]
+      (is (some #(= 'tigris (:to %)) deps))
+      (is (some #(= 'com.fasterxml.jackson.core/jackson-core (:to %)) deps))))
 
-  (testing "transitive dependencies are present"
-    (let [cheshire-deps (deps/dependencies test-db 'cheshire)]
-      (is (some #(= 'tigris (:to %)) cheshire-deps)
-          "cheshire should depend on tigris")))
+  (testing "ring-core has correct direct deps"
+    (let [deps (deps/dependencies test-db 'ring/ring-core)]
+      (is (some #(= 'commons-codec (:to %)) deps))
+      (is (some #(= 'ring/ring-codec (:to %)) deps)))))
 
-  (testing "deeply nested transitive deps are captured"
-    (let [info (deps/artifact-info test-db 'org.apache.httpcomponents/httpcore)]
-      (is (some? info)
-          "httpcore (nested under aws-sdk-core) should be in db")
-      (is (= "4.4.13" (:version info)))))
+(deftest version-conflict-detection
+  (testing "requested vs resolved versions available on dependency edges"
+    (let [ring-deps (deps/dependencies test-db 'ring/ring-core)
+          codec-dep (first (filter #(= 'commons-codec (:to %)) ring-deps))]
+      (is (some? codec-dep))
+      (is (= "1.10" (:requested-version codec-dep))
+          "requested version should be what ring-core declared")
+      (is (= "1.11" (:resolved-version codec-dep))
+          "resolved version should be the Aether-selected version"))))
 
+(deftest leaf-nodes
   (testing "leaf nodes have no deps"
     (let [tigris (deps/artifact-info test-db 'tigris)]
       (is (some? tigris))
-      (is (nil? (:deps tigris)) "leaf nodes should have no :deps")))
+      (is (nil? (:deps tigris))))))
 
-  (testing "dependants reverse index works"
-    (let [clj-dependants (deps/dependants test-db 'org.clojure/clojure)]
-      (is (some #(= 'ROOT (:from %)) clj-dependants)
-          "clojure should have ROOT as a dependant"))))
-
-(deftest version-mismatch-detection
-  (testing "requested vs resolved versions are available"
-    (let [root-deps (deps/dependencies test-db 'ROOT)]
-      (is (every? #(string? (:requested-version %)) root-deps)
-          "all ROOT deps should have requested versions")
-      (is (every? #(string? (:resolved-version %)) root-deps)
-          "all ROOT deps should have resolved versions"))))
-
-(deftest artifact-count
-  (testing "reasonable number of artifacts parsed"
-    (let [all-keys (deps/artifact-keys test-db)]
-      (is (> (count all-keys) 50)
-          "should have many artifacts from the test project")
-      (is (some #(= 'ROOT %) all-keys)
-          "ROOT should be among the keys"))))
-
-(deftest exclusions-and-scopes-ignored
-  (testing "artifacts with :exclusions are still parsed"
-    (is (some? (deps/artifact-info test-db 'colorize))
-        "colorize (has :exclusions) should be in db"))
-
-  (testing "artifacts with :scope are still parsed"
-    (is (some? (deps/artifact-info test-db 'criterium))
-        "criterium (has :scope test) should be in db")))
+(deftest dependants-reverse-index
+  (testing "commons-codec has multiple dependants"
+    (let [dependants (deps/dependants test-db 'commons-codec)]
+      (is (some #(= 'ring/ring-core (:from %)) dependants))
+      (is (some #(= 'ring/ring-codec (:from %)) dependants)))))

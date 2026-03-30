@@ -5,6 +5,7 @@
             [clj-reload.core :refer [reload]]
             [net.lewisship.dex.deps :as deps]
             [net.lewisship.dex.deps-reader :as deps-reader]
+            [net.lewisship.dex.lein-reader :as lein-reader]
             [net.lewisship.dex.service :as service]))
 
 (comment
@@ -23,6 +24,9 @@
   ;; Or resolve live from a deps.edn (this project as an example)
   (let [raw-data (deps-reader/read-deps (fs/file "deps.edn") {:aliases ["dev" "test"]})]
     (reset! deps/*db (deps/build-db raw-data)))
+
+  (-> (lein-reader/read-deps (fs/file "../../nubank/common-core/project.clj") nil)
+      deps/build-db)
 
   ;; --- Server lifecycle ---
 
