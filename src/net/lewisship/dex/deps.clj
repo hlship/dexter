@@ -39,10 +39,12 @@
   - :dependants    - reverse index {key -> [{:from key :requested-version v}]}
   - :by-label      - {lowercase-label -> key} for search"
   [raw-data]
-  (let [;; Ensure every artifact has a :label
+  (let [;; Ensure every artifact has a :label, and sort :deps alphabetically
         artifacts (reduce-kv
                    (fn [m k info]
-                     (assoc m k (update info :label #(or % (str k)))))
+                     (assoc m k (-> info
+                                    (update :label #(or % (str k)))
+                                    (update :deps #(when (seq %) (into (sorted-map) %))))))
                    {}
                    raw-data)
         ;; Build label index: lowercase label -> artifact key
@@ -50,9 +52,15 @@
                   (fn [m k {:keys [label]}]
                     (assoc m (string/lower-case label) k))
                   {}
-                  artifacts)]
+                  artifacts)
+        ;; Build dependants index with each entry sorted by :from key
+        dependants (reduce-kv
+                    (fn [m k entries]
+                      (assoc m k (vec (sort-by :from entries))))
+                    {}
+                    (build-dependants-index raw-data))]
     {:artifacts artifacts
-     :dependants (build-dependants-index raw-data)
+     :dependants dependants
      :by-label by-label}))
 
 (defn artifact-keys
