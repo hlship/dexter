@@ -11,12 +11,7 @@
   ;; --- Running from the CLI entry point ---
 
   (cli/set-prevent-exit! true)
-
-  (require '[net.lewisship.dex.main])
-  ((resolve 'net.lewisship.dex.main/-main))
-  ((resolve 'net.lewisship.dex.main/-main) "-adev")
-  ((resolve 'net.lewisship.dex.main/-main) "-f..")
-
+  
   (-> ".." fs/absolutize fs/normalize)
 
   ;; --- Loading data manually ---

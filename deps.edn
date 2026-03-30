@@ -6,11 +6,10 @@
   org.clojure/tools.deps                       {:mvn/version "0.29.1598"}
   io.github.hlship/cli-tools                   {:mvn/version "0.16.0-beta-5"}
   babashka/process                             {:mvn/version "0.6.25"}
-  babashka/fs                                  {:mvn/version "0.5.31"}
-  org.clj-commons/humanize                     {:mvn/version "1.1"}
+  babashka/fs                                  {:mvn/version "0.5.32"}
+  org.clj-commons/humanize                     {:mvn/version "1.2"}
   dynamic-alpha/hyper                          {:git/url "https://github.com/dynamic-alpha/hyper"
-                                                :git/sha "cbd8e757a3c96eb1e080b38c108514bac8357da6"}
-  com.aayushatharva.brotli4j/native-osx-x86_64 {:mvn/version "1.20.0"}
+                                                :git/sha "dd5422ddf0485d7c73bb11eff05452d1149acdfa"}
   version-clj/version-clj                      {:mvn/version "2.0.3"}
   org.slf4j/slf4j-nop                          {:mvn/version "2.0.17"}}
 
@@ -22,7 +21,7 @@
                        io.github.tonsky/clj-reload {:mvn/version "1.0.0"}}}
 
   :build
-  {:deps       {io.github.clojure/tools.build {:mvn/version "0.10.12"}}
+  {:deps       {io.github.clojure/tools.build {:mvn/version "0.10.13"}}
    :ns-default build}
 
   :test {:extra-paths ["test" "test-resources"]
