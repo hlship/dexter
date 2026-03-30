@@ -10,13 +10,13 @@
   (edn/read-string (slurp "test-resources/dex/test-project.clj")))
 
 (def ^:private test-db
-  (deps/build-db (lein-reader/parse-tree-data test-tree-data "test-project")))
+  (deps/build-db (lein-reader/parse-tree-data test-tree-data {:label "test-project" :version "1.2.3"})))
 
 (deftest parse-tree-data-produces-valid-db-structure
   (testing "ROOT entry exists with label and deps"
     (let [root (deps/artifact-info test-db 'ROOT)]
       (is (some? root) "ROOT entry should exist")
-      (is (= "0.0.0" (:version root)))
+      (is (= "1.2.3" (:version root)))
       (is (= "test-project" (:label root)))
       (is (map? (:deps root)) "ROOT should have deps")
       (is (contains? (:deps root) 'cheshire)

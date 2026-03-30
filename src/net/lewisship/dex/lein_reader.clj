@@ -53,13 +53,27 @@
    acc
    tree-data))
 
+(defn- parse-project-clj
+  "Extracts the project name and version from a project.clj file.
+  project.clj has the form: (defproject name \"version\" ...)
+  Returns {:name string, :version string} or nil if parsing fails."
+  [project-clj-path]
+  (try
+    (let [form (read-string (slurp (str project-clj-path)))]
+      (when (list? form)
+        (let [[defp project-name project-version] form]
+          (when (and (= 'defproject defp) project-name project-version)
+            {:name (str project-name)
+             :version (str project-version)}))))
+    (catch Exception _ nil)))
+
 (defn parse-tree-data
   "Parses lein deps :tree-data output into the flat artifact map
   expected by deps/build-db.
 
   tree-data is the nested map structure produced by `lein deps :tree-data`.
-  project-label is an optional display label for the ROOT entry."
-  [tree-data project-label]
+  project-info is a map with optional :label and :version for the ROOT entry."
+  [tree-data {:keys [label version]}]
   (let [;; ROOT's direct deps are the top-level keys
         root-deps (reduce-kv
                    (fn [m dep-vec _]
@@ -67,8 +81,8 @@
                             {:version (dep-vec->version dep-vec)}))
                    {}
                    tree-data)
-        root-entry (cond-> {:version "0.0.0"}
-                     (seq project-label) (assoc :label project-label)
+        root-entry (cond-> {:version (or version "0.0.0")}
+                     (seq label) (assoc :label label)
                      (seq root-deps) (assoc :deps root-deps))
         ;; Walk the tree to collect all artifacts
         artifacts (walk-tree tree-data {})]
@@ -104,8 +118,11 @@
   [project-clj-path {:keys [aliases label]}]
   (let [project-file (fs/absolutize project-clj-path)
         project-dir (fs/parent project-file)
+        project-info (parse-project-clj project-file)
         project-label (or label
+                          (:name project-info)
                           (when project-dir
                             (str (fs/file-name project-dir))))
         tree-data (run-lein project-dir aliases)]
-    (parse-tree-data tree-data project-label)))
+    (parse-tree-data tree-data {:label project-label
+                                :version (:version project-info)})))
