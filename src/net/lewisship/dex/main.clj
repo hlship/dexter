@@ -12,8 +12,8 @@
     (.getLocalPort s)))
 
 (def ^:private readers
-  [["deps.edn" 'net.lewisship.dex.deps-reader/deps-reader]
-   ["project.clj" 'net.lewisship.dex.lein-reader/lein-reader]])
+  [["deps.edn" 'net.lewisship.dex.deps-reader/read-deps]
+   ["project.clj" 'net.lewisship.dex.lein-reader/read-deps]])
 
 (defn- invoke [reader-sym file opts]
   (when (fs/exists? file)
@@ -44,11 +44,11 @@
          :parse-fn parse-long
          :validate [some? "Not a number"
                     #(<= 1000 %) "Must be at least 1000"]]
-   file ["-f" "--file PATH" "Dependency file to read"]
+   file ["-f" "--file PATH" "Dependency file to read, or directory to search"]
    aliases ["-a" "--alias NAME" "Add an alias (also known as a profile) used when resolving dependencies"
             :multi true
             :update-fn (fnil conj [])]
-   no-open? ["-O" "--no-open" "Do not automatically open a browser"]
+   no-open? [nil "--no-open" "Do not automatically open a browser"]
    :command "dexter"]
   (let [port' (or port (free-port))
         path  (-> (or file ".") fs/absolutize fs/normalize)
@@ -73,5 +73,3 @@
       ((requiring-resolve 'clojure.java.browse/browse-url) url))
     ;; Hang forever (until ^C)
     @(promise)))
-
-

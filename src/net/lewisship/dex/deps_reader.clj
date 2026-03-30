@@ -25,7 +25,7 @@
       "unknown"))
 
 (defn- tree-node->deps
-  "Extracts the direct dependencies from a tree node's :children map.
+  "Extracts the direct dep[endencies from a tree node's :children map.
   Returns a map of {lib-symbol -> {:version requested-version}} for all
   children, regardless of whether their version was selected.  The dependency
   relationship exists even when a different version was ultimately resolved."
