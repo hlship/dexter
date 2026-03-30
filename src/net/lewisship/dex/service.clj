@@ -15,7 +15,8 @@
 (def handler (h/create-handler
               #'routes
               :static-resources "public"
-              :head [[:script {:type "importmap"}
+              :head [[:link {:rel "icon" :type "image/svg+xml" :href "/favicon.svg"}]
+                     [:script {:type "importmap"}
                       (json/generate-string
                        {:imports
                         {:datastar "https://cdn.jsdelivr.net/gh/starfederation/datastar@1.0.0-RC.7/bundles/datastar.js"}})]

@@ -100,7 +100,7 @@
 
   ;; Or resolve live from a deps.edn (this project as an example)
   (do
-    (require [net.lewisship.dex.deps-reader :as deps-reader])
+    (require '[net.lewisship.dex.deps-reader :as deps-reader])
     (let [raw-data (deps-reader/read-deps (fs/file "deps.edn") {:aliases ["dev" "test"]})]
       (reset! deps/*db (deps/build-db raw-data))))
   
@@ -109,7 +109,7 @@
   (service/stop!)
 
   (do
-    (require [net.lewisship.dex.service :as service])
+    (require '[net.lewisship.dex.service :as service])
     ((requiring-resolve 'clj-reload.core/reload))
     (service/stop!)
     (service/start! nil))
