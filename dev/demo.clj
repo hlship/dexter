@@ -2,6 +2,7 @@
   "REPL scratch pad for running and testing Dexter interactively."
   (:require [babashka.fs :as fs]
             [net.lewisship.cli-tools :as cli]
+            [clj-reload.core :refer [reload]]
             [net.lewisship.dex.deps :as deps]
             [net.lewisship.dex.deps-reader :as deps-reader]
             [net.lewisship.dex.service :as service]))
@@ -30,7 +31,7 @@
   (service/stop!)
 
   (do
-    ((requiring-resolve 'clj-reload.core/reload))
+    (reload)
     (service/stop!)
     (service/start! {}))
 

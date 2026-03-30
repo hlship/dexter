@@ -82,6 +82,33 @@
              (assoc :centerId center-id)))
          connections)))
 
+;; --- Footer ---
+
+(defn- render-footer
+  "Renders a footer bar with summary statistics about the dependency graph."
+  [db]
+  (let [{:keys [artifact-count dep-count compatible incompatible unknown]}
+        (layout/summary-stats db)
+        summary (str artifact-count " artifacts; " dep-count " dependencies")
+        parts (cond-> []
+                (pos? (or compatible 0))
+                (conj [:span {:class "text-green-600"}
+                       (str compatible " compatible")])
+                (pos? (or incompatible 0))
+                (conj [:span {:class "text-red-600 font-semibold"}
+                       (str incompatible " incompatible")])
+                (pos? (or unknown 0))
+                (conj [:span {:class "text-yellow-600"}
+                       (str unknown " unknown")]))]
+    [:div {:class "bg-white border-t border-slate-200 px-4 py-1.5 text-xs text-slate-500 shrink-0"}
+     (if (seq parts)
+       (str summary " — ")
+       summary)
+     (for [[i part] (map-indexed vector parts)]
+       (if (zero? i)
+         part
+         [:span " · " part]))]))
+
 ;; --- Page Rendering ---
 
 (defn- render-toolbar
@@ -192,4 +219,7 @@
                    (h/action))]
 
       ;; Right column: dependencies
-      (render-column (:right layout-data) :right selected cursor)]]))
+      (render-column (:right layout-data) :right selected cursor)]
+
+     ;; Footer with summary statistics
+     (render-footer db)]))

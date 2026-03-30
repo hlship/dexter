@@ -176,6 +176,31 @@
                    (deps/dependencies db from-key))))
           visible-keys)))
 
+(defn summary-stats
+  "Computes summary statistics for the entire dependency database.
+
+  Returns a map with:
+  - :artifact-count  - total number of artifacts (excluding ROOT)
+  - :dep-count       - total number of dependency relationships
+  - :compatible      - count of compatible (but not exact) version matches
+  - :incompatible    - count of incompatible version matches
+  - :unknown         - count of unknown version matches (git SHA, etc.)"
+  [db]
+  (let [all-keys (remove #{'ROOT} (deps/artifact-keys db))
+        counts (reduce
+                (fn [acc artifact-key]
+                  (reduce
+                   (fn [acc {:keys [requested-version resolved-version]}]
+                     (let [m (version-match requested-version resolved-version)]
+                       (-> acc
+                           (update :dep-count inc)
+                           (update m (fnil inc 0)))))
+                   acc
+                   (deps/dependencies db artifact-key)))
+                {:dep-count 0}
+                (cons 'ROOT all-keys))]
+    (assoc counts :artifact-count (count all-keys))))
+
 (defn compute-layout
   "Computes the full layout for the dependency viewer.
 
