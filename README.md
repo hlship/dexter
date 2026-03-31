@@ -124,12 +124,12 @@ From the REPL:
 ;; Load a deps.edn project
 (require '[net.lewisship.dex.deps-reader :as deps-reader])
 (require '[net.lewisship.dex.deps :as deps])
-(let [raw-data (deps-reader/read-deps "deps.edn" {:aliases [:dev :test]})]
-  (reset! deps/*db (deps/build-db raw-data)))
+(def db (-> (deps-reader/read-deps "deps.edn" {:aliases [:dev :test]})
+            deps/build-db))
 
 ;; Start the server
 (require '[net.lewisship.dex.service :as service])
-(service/start! {})
+(service/start! {:db db})
 
 ;; Stop
 (service/stop!)

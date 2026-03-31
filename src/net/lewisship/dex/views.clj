@@ -110,11 +110,11 @@
            (h/action
             (let [delta (if (pos? $scroll-delta-y) 1 -1)]
               (swap! cursor update offset-key
-                     (scroll-offset @deps/*db cursor column delta))))}
+                     (scroll-offset db cursor column delta))))}
      (render-overflow-indicator
       before :up
       (h/action (swap! cursor update offset-key
-                       (scroll-offset @deps/*db cursor column -1))))
+                       (scroll-offset db cursor column -1))))
      (for [box boxes]
        (render-box box (= (:key box) selected-key)
                    (h/action
@@ -122,7 +122,7 @@
      (render-overflow-indicator
       after :down
       (h/action (swap! cursor update offset-key
-                       (scroll-offset @deps/*db cursor column 1))))]))
+                       (scroll-offset db cursor column 1))))]))
 
 ;; --- Connection Data ---
 
@@ -227,7 +227,7 @@
                  ;; - server-side reset! to keep cursor state clean
                  ;; - client-side el.value/blur to clear the visible input immediately
                  :data-on:change (str (h/action
-                                       (when-let [k (deps/find-artifact @deps/*db $value)]
+                                       (when-let [k (deps/find-artifact db $value)]
                                          (navigate! cursor k))
                                        (reset! search ""))
                                       "; el.value = ''; el.blur()")
@@ -235,7 +235,7 @@
                  :data-on:keydown
                  (str "if (evt.key !== 'Enter') return; evt.preventDefault(); "
                       (h/action
-                       (when-let [found (deps/find-artifact @deps/*db $value)]
+                       (when-let [found (deps/find-artifact db $value)]
                          (navigate! cursor found))
                        (reset! search ""))
                       "; el.value = ''; el.blur()")}]
@@ -245,8 +245,8 @@
                :let [label (:label (deps/artifact-info db k))]]
            [:option {:value label}])]])]))
 
-(defn home-page [_]
-  (let [db @deps/*db
+(defn home-page [req]
+  (let [db (:db @(:hyper/app-state req))
         cursor (h/tab-cursor :view {:selected 'ROOT
                                     :left-offset 0
                                     :right-offset 0

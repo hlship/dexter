@@ -127,14 +127,4 @@
       edn/read-string
       build-db))
 
-;; Holds the current database; set via load-db! for REPL use,
-;; or by the main entry point before starting the server.
-(defonce *db (atom nil))
 
-(defn load-db!
-  "Loads a dependency file and stores the db in the *db atom.
-  Returns the db."
-  [path]
-  (let [db (load-db path)]
-    (reset! *db db)
-    db))

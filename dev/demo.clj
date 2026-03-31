@@ -8,6 +8,10 @@
             [net.lewisship.dex.lein-reader :as lein-reader]
             [net.lewisship.dex.service :as service]))
 
+;; Holds the current db for REPL convenience; load data into this atom,
+;; then pass @*db to service/start!.
+(defonce *db (atom nil))
+
 (comment
 
   ;; --- Running from the CLI entry point ---
@@ -17,26 +21,27 @@
   ;; --- Loading data manually ---
 
   ;; Load from pre-built test data
-  (deps/load-db! "test-resources/dex/project-deps.edn")
+  (reset! *db (deps/load-db "test-resources/dex/project-deps.edn"))
 
   ;; Or resolve live from a deps.edn (this project as an example)
-  (let [raw-data (deps-reader/read-deps (fs/file "deps.edn") {:aliases ["dev" "test"]})]
-    (reset! deps/*db (deps/build-db raw-data)))
+  (reset! *db
+          (-> (deps-reader/read-deps (fs/file "deps.edn") {:aliases ["dev" "test"]})
+              deps/build-db))
 
-  (reset! deps/*db
+  (reset! *db
           (-> (lein-reader/read-deps (fs/file "../../nubank/balatro/project.clj") nil)
               deps/build-db))
 
   ;; --- Server lifecycle ---
 
-  (service/start! {})
+  (service/start! {:db @*db})
 
   (service/stop!)
 
   (do
     (reload)
     (service/stop!)
-    (service/start! {}))
+    (service/start! {:db @*db}))
 
   ;;
   )

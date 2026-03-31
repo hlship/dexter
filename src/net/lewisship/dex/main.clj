@@ -65,9 +65,8 @@
                      sort)
                 :maximum-display 100)]))
     (pout [:faint "Running web server at "] [:bold url] " ...")
-    ;; TODO: As an argument to start! not this funky mess
-    (reset! deps/*db (deps/build-db data))
-    ((requiring-resolve 'net.lewisship.dex.service/start!) {:port port'})
+    ((requiring-resolve 'net.lewisship.dex.service/start!) {:port port'
+                                                           :db (deps/build-db data)})
     (pout "Hit " [:bold "Ctrl+C"] " when done")
     (when-not no-open?
       ((requiring-resolve 'clojure.java.browse/browse-url) url))
