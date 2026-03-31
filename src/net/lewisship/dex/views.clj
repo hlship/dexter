@@ -8,6 +8,41 @@
             [net.lewisship.dex.deps :as deps]
             [net.lewisship.dex.layout :as layout]))
 
+;; --- Navigation History ---
+
+(defn- navigate!
+  "Pushes the current view state onto :nav-history, then navigates to the
+  given artifact key with offsets reset to 0. No-op if already viewing
+  the target artifact."
+  [cursor artifact-key]
+  (let [{:keys [selected left-offset right-offset]} @cursor]
+    (when (not= selected artifact-key)
+      (swap! cursor
+             (fn [state]
+               (-> state
+                   (update :nav-history (fnil conj [])
+                           {:selected (:selected state)
+                            :left-offset (:left-offset state)
+                            :right-offset (:right-offset state)})
+                   (assoc :selected artifact-key
+                          :left-offset 0
+                          :right-offset 0)))))))
+
+(defn- navigate-back!
+  "Pops the most recent entry from :nav-history and restores its state.
+  No-op if history is empty."
+  [cursor]
+  (let [history (:nav-history @cursor)]
+    (when (seq history)
+      (let [prev (peek history)]
+        (swap! cursor
+               (fn [state]
+                 (-> state
+                     (assoc :selected (:selected prev)
+                            :left-offset (:left-offset prev)
+                            :right-offset (:right-offset prev))
+                     (update :nav-history pop))))))))
+
 ;; --- Box Rendering ---
 
 (defn- render-box
@@ -55,10 +90,7 @@
      (for [box boxes]
        (render-box box (= (:key box) selected-key)
                    (h/action
-                    (swap! cursor assoc
-                           :selected (:key box)
-                           :left-offset 0
-                           :right-offset 0))))
+                    (navigate! cursor (:key box)))))
      (render-overflow-indicator
       after :down
       (h/action (swap! cursor update offset-key inc)))]))
@@ -114,73 +146,82 @@
 (defn- render-toolbar
   "Renders the top toolbar with navigation controls and artifact search."
   [cursor selected db]
-  [:div {:class "bg-white border-b border-slate-200 shadow-sm px-4 py-2 flex items-center gap-4 shrink-0"}
-   ;; Home button
-   [:button {:class (str "p-2 rounded-lg transition-colors "
-                         (if (= selected 'ROOT)
-                           "text-slate-300 cursor-default"
-                           "text-slate-600 hover:bg-slate-100 hover:text-blue-600"))
-             :title "Go to root"
-             :data-accel "h"
-             :data-on:click (h/action
-                             (swap! cursor assoc
-                                    :selected 'ROOT
-                                    :left-offset 0
-                                    :right-offset 0))}
-    ;; Home icon (SVG)
-    [:svg {:class "w-5 h-5" :viewBox "0 0 20 20" :fill "currentColor"
-           :xmlns "http://www.w3.org/2000/svg"}
-     [:path {:fill-rule "evenodd" :clip-rule "evenodd"
-             :d "M9.293 2.293a1 1 0 011.414 0l7 7A1 1 0 0117 11h-1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-3a1 1 0 00-1-1H9a1 1 0 00-1 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-6H3a1 1 0 01-.707-1.707l7-7z"}]]]
-   ;; Current selection label
-   [:span {:class "text-sm text-slate-500"}
-    (:label (deps/artifact-info db selected))]
-   ;; Spacer
-   [:div {:class "flex-1"}]
-   ;; Artifact search
-   (let [search (h/tab-cursor :search "")]
-     [:div {:class "relative"}
-      [:input {:id "artifact-search"
-               :class "w-64 px-3 py-1.5 text-sm border border-slate-300 rounded-lg
-                       focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400"
-               :type "text"
-               :placeholder "Search artifact..."
-               :data-accel "f"
-               :list "artifact-list"
-               :value @search
-               ;; Idiomorph preserves focused input values, so we need both:
-               ;; - server-side reset! to keep cursor state clean
-               ;; - client-side el.value/blur to clear the visible input immediately
-               :data-on:change (str (h/action
-                                     (when-let [k (deps/find-artifact @deps/*db $value)]
-                                       (swap! cursor assoc
-                                              :selected k
-                                              :left-offset 0
-                                              :right-offset 0))
-                                     (reset! search ""))
-                                    "; el.value = ''; el.blur()")
-               ;; Enter: find first substring match and navigate to it
-               :data-on:keydown
-               (str "if (evt.key !== 'Enter') return; evt.preventDefault(); "
-                    (h/action
-                     (when-let [found (deps/find-artifact @deps/*db $value)]
-                       (swap! cursor assoc
-                              :selected found
-                              :left-offset 0
-                              :right-offset 0))
-                     (reset! search ""))
-                    "; el.value = ''; el.blur()")}]
-      ;; Datalist provides browser-native autocomplete using artifact labels
-      [:datalist {:id "artifact-list"}
-       (for [k (sort (deps/artifact-keys db))
-             :let [label (:label (deps/artifact-info db k))]]
-         [:option {:value label}])]])])
+  (let [history (:nav-history @cursor)
+        has-history? (seq history)]
+    [:div {:class "bg-white border-b border-slate-200 shadow-sm px-4 py-2 flex items-center gap-4 shrink-0"}
+     ;; Home button
+     [:button {:class (str "p-2 rounded-lg transition-colors "
+                           (if (= selected 'ROOT)
+                             "text-slate-300 cursor-default"
+                             "text-slate-600 hover:bg-slate-100 hover:text-blue-600"))
+               :title "Go to root"
+               :data-accel "h"
+               :data-on:click (h/action
+                               (navigate! cursor 'ROOT))}
+      ;; Home icon (SVG)
+      [:svg {:class "w-5 h-5" :viewBox "0 0 20 20" :fill "currentColor"
+             :xmlns "http://www.w3.org/2000/svg"}
+       [:path {:fill-rule "evenodd" :clip-rule "evenodd"
+               :d "M9.293 2.293a1 1 0 011.414 0l7 7A1 1 0 0117 11h-1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-3a1 1 0 00-1-1H9a1 1 0 00-1 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-6H3a1 1 0 01-.707-1.707l7-7z"}]]]
+     ;; Back button
+     [:button {:class (str "p-2 rounded-lg transition-colors "
+                           (if has-history?
+                             "text-slate-600 hover:bg-slate-100 hover:text-blue-600"
+                             "text-slate-300 cursor-default"))
+               :title "Go back"
+               :disabled (not has-history?)
+               :data-accel "b"
+               :data-on:click (h/action
+                               (navigate-back! cursor))}
+      ;; Back arrow icon (SVG) — arrow-left
+      [:svg {:class "w-5 h-5" :viewBox "0 0 20 20" :fill "currentColor"
+             :xmlns "http://www.w3.org/2000/svg"}
+       [:path {:fill-rule "evenodd" :clip-rule "evenodd"
+               :d "M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z"}]]]
+     ;; Current selection label
+     [:span {:class "text-sm text-slate-500"}
+      (:label (deps/artifact-info db selected))]
+     ;; Spacer
+     [:div {:class "flex-1"}]
+     ;; Artifact search
+     (let [search (h/tab-cursor :search "")]
+       [:div {:class "relative"}
+        [:input {:id "artifact-search"
+                 :class "w-64 px-3 py-1.5 text-sm border border-slate-300 rounded-lg
+                         focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400"
+                 :type "text"
+                 :placeholder "Search artifact..."
+                 :data-accel "f"
+                 :list "artifact-list"
+                 :value @search
+                 ;; Idiomorph preserves focused input values, so we need both:
+                 ;; - server-side reset! to keep cursor state clean
+                 ;; - client-side el.value/blur to clear the visible input immediately
+                 :data-on:change (str (h/action
+                                       (when-let [k (deps/find-artifact @deps/*db $value)]
+                                         (navigate! cursor k))
+                                       (reset! search ""))
+                                      "; el.value = ''; el.blur()")
+                 ;; Enter: find first substring match and navigate to it
+                 :data-on:keydown
+                 (str "if (evt.key !== 'Enter') return; evt.preventDefault(); "
+                      (h/action
+                       (when-let [found (deps/find-artifact @deps/*db $value)]
+                         (navigate! cursor found))
+                       (reset! search ""))
+                      "; el.value = ''; el.blur()")}]
+        ;; Datalist provides browser-native autocomplete using artifact labels
+        [:datalist {:id "artifact-list"}
+         (for [k (sort (deps/artifact-keys db))
+               :let [label (:label (deps/artifact-info db k))]]
+           [:option {:value label}])]])]))
 
 (defn home-page [_]
   (let [db @deps/*db
         cursor (h/tab-cursor :view {:selected 'ROOT
                                     :left-offset 0
                                     :right-offset 0
+                                    :nav-history []
                                     :hidden-libs layout/default-hidden-libs
                                     :max-visible nil})
         {:keys [selected left-offset right-offset hidden-libs max-visible]} @cursor
@@ -195,7 +236,7 @@
      [:div {:id "dep-viewer"
             :class "flex-1 relative flex justify-center gap-[120px] overflow-auto"
             :data-draw-arrows (connections->json (:connections layout-data)
-                                                  (:id (:selected-box layout-data)))
+                                                 (:id (:selected-box layout-data)))
             :data-track-height "true"
             :data-on:change__debounce.300ms
             (h/action

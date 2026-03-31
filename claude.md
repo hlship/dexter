@@ -41,6 +41,13 @@ Special key `'ROOT` represents the project itself.
  :by-label   {lowercase-label -> key}}             ; search index
 ```
 
+**View cursor** (Hyper tab-cursor `:view`):
+```clojure
+{:selected artifact-key, :left-offset int, :right-offset int,
+ :nav-history [{:selected key :left-offset n :right-offset n} ...],  ; stack (vector, peek/pop)
+ :hidden-libs #{...}, :max-visible int?}
+```
+
 **Layout** (output of `layout/compute-layout`):
 ```clojure
 {:selected-box box-descriptor
@@ -51,6 +58,7 @@ Special key `'ROOT` represents the project itself.
 
 ## Conventions
 
+- **Navigation:** All artifact selection changes (box clicks, search, home) go through `navigate!` which pushes current state onto `:nav-history` before switching. `navigate-back!` pops the stack and restores `{:selected :left-offset :right-offset}`.
 - **Rendering:** Hiccup vectors with Tailwind utility classes. Use `h/action` for server-side actions triggered by Datastar `data-on:*` attributes.
 - **Client params:** `$value`, `$key`, `$form-data` etc. are Hyper macros that extract DOM values client-side and send them to the server action. They appear as unresolvable symbols in the editor — this is expected.
 - **Idiomorph caveat:** Datastar's DOM morpher preserves focused input values. Use `el.value = ''; el.blur()` appended to action expressions when inputs need clearing.
@@ -79,6 +87,7 @@ bb test
 
 - **⌘F** / **Ctrl+F** — Focus artifact search field
 - **⌘H** / **Ctrl+H** — Navigate to root node
+- **⌘B** / **Ctrl+B** — Navigate back (undo last navigation)
 
 ## Future Work
 
