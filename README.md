@@ -28,23 +28,24 @@ Mousing over a dependency arrow expands it and, for non-exact matches, displays 
 
 ## Installation
 
-Dexter requires Clojure CLI (`clojure`) to be installed. For Leiningen projects, `lein` must also be on the PATH.
+### Homebrew (OS X)
 
-```bash
-# Clone the repository
-git clone https://github.com/hlship/dexter.git
-cd dexter
-```
+Install with `brew install hlship/brew/dexter`.
+
+### Linux (or manual)
+
+Download Dexter from [GitHub Releases](https://github.com/hlship/dexter/releases)
+and unpack the distribution, which includes the `dexter` script, and the JAR file
+containing the code.
+
+Copy the two files to a directory on your `$PATH`, _or_, create a symlink
+for the `dexter` script in a directory on your `$PATH` (the script will follow 
+symlinks to find the JAR).
 
 ## Usage
 
-From within any project directory that contains a `deps.edn` or `project.clj`:
 
-```bash
-clojure -M:run
-```
-
-Dexter auto-detects the project type, resolves the full transitive dependency graph, starts a local web server, and opens a browser.
+The `dexter` command auto-detects the project type, resolves the full transitive dependency graph, starts a local web server, and opens a browser.
 
 ### Options
 
@@ -52,23 +53,23 @@ Dexter auto-detects the project type, resolves the full transitive dependency gr
   -p, --port NUMBER   Port for the web server (default: random free port)
   -f, --file PATH     Path to a dependency file (default: current directory)
   -a, --alias NAME    Add a build alias/profile (repeatable)
-  -O, --no-open       Don't automatically open a browser
+  --no-open           Don't automatically open a browser
 ```
 
 ### Examples
 
 ```bash
 # Explore the current project
-clojure -M:run
+dexter
 
 # Explore a specific project with dev dependencies included
-clojure -M:run -f /path/to/project -a dev
+dexter -f /path/to/project -a dev
 
 # Leiningen project with dev and test profiles
-clojure -M:run -f /path/to/project.clj -a dev -a test
+dexter -f /path/to/project.clj -a dev -a test
 
 # Use a specific port, don't open browser
-clojure -M:run -p 8080 -O
+dexter -p 8080 -O
 ```
 
 ## Understanding the Display

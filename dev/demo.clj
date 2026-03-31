@@ -2,6 +2,7 @@
   "REPL scratch pad for running and testing Dexter interactively."
   (:require [babashka.fs :as fs]
             [net.lewisship.cli-tools :as cli]
+            [net.lewisship.dex.main :as main]
             [clj-reload.core :refer [reload]]
             [net.lewisship.dex.deps :as deps]
             [net.lewisship.dex.deps-reader :as deps-reader]
@@ -14,8 +15,6 @@
 
   (cli/set-prevent-exit! true)
   
-  (-> ".." fs/absolutize fs/normalize)
-
   ;; --- Loading data manually ---
 
   ;; Load from pre-built test data
