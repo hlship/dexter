@@ -8,6 +8,12 @@
             [net.lewisship.dex.deps :as deps]
             [net.lewisship.dex.layout :as layout]))
 
+;; Extend Hyper's client-param registry so that $scroll-delta-y can be used
+;; inside h/action forms to receive the wheel event's deltaY on the server.
+;; This must execute before any h/action macro that references the symbol.
+(alter-var-root #'h/client-param-registry
+                assoc '$scroll-delta-y {:js "evt.deltaY" :key "scrollDeltaY"})
+
 ;; --- Navigation History ---
 
 (defn- navigate!
@@ -15,7 +21,7 @@
   given artifact key with offsets reset to 0. No-op if already viewing
   the target artifact."
   [cursor artifact-key]
-  (let [{:keys [selected left-offset right-offset]} @cursor]
+  (let [{:keys [selected]} @cursor]
     (when (not= selected artifact-key)
       (swap! cursor
              (fn [state]
@@ -42,6 +48,22 @@
                             :left-offset (:left-offset prev)
                             :right-offset (:right-offset prev))
                      (update :nav-history pop))))))))
+
+;; --- Column Scrolling ---
+
+(defn- scroll-offset
+  "Returns a function that adjusts a column offset by `delta` (+1 or -1),
+  clamping to [0, total - max-visible].  `column-key` is the layout key
+  (:left or :right) used to look up the windowed column data."
+  [db cursor column-key delta]
+  (let [{:keys [selected left-offset right-offset hidden-libs max-visible]} @cursor
+        layout-data (layout/compute-layout db selected left-offset right-offset
+                                           hidden-libs max-visible)
+        {:keys [total]} (get layout-data column-key)
+        max-visible (or max-visible layout/default-max-visible)
+        max-offset  (max 0 (- total max-visible))]
+    (fn [current]
+      (max 0 (min max-offset (+ current delta))))))
 
 ;; --- Box Rendering ---
 
@@ -81,19 +103,26 @@
 (defn- render-column
   "Renders a column of artifact boxes with optional overflow indicators.
   The column fills its parent's height and vertically centers its boxes."
-  [{:keys [boxes before after]} column selected-key cursor]
+  [{:keys [boxes before after]} column selected-key cursor db]
   (let [offset-key (case column :left :left-offset :right :right-offset)]
-    [:div {:class "relative flex flex-col justify-center gap-3 w-[280px] h-full"}
+    [:div {:class "relative flex flex-col justify-center gap-3 w-[280px] h-full"
+           :data-on:wheel__prevent__throttle.150ms
+           (h/action
+            (let [delta (if (pos? $scroll-delta-y) 1 -1)]
+              (swap! cursor update offset-key
+                     (scroll-offset @deps/*db cursor column delta))))}
      (render-overflow-indicator
       before :up
-      (h/action (swap! cursor update offset-key dec)))
+      (h/action (swap! cursor update offset-key
+                       (scroll-offset @deps/*db cursor column -1))))
      (for [box boxes]
        (render-box box (= (:key box) selected-key)
                    (h/action
                     (navigate! cursor (:key box)))))
      (render-overflow-indicator
       after :down
-      (h/action (swap! cursor update offset-key inc)))]))
+      (h/action (swap! cursor update offset-key
+                       (scroll-offset @deps/*db cursor column 1))))]))
 
 ;; --- Connection Data ---
 
@@ -252,7 +281,7 @@
              :xmlns "http://www.w3.org/2000/svg"}]
 
       ;; Left column: dependants
-      (render-column (:left layout-data) :left selected cursor)
+      (render-column (:left layout-data) :left selected cursor db)
 
       ;; Center: selected artifact
       [:div {:class "relative flex flex-col justify-center w-[280px] h-full"}
@@ -260,7 +289,7 @@
                    (h/action))]
 
       ;; Right column: dependencies
-      (render-column (:right layout-data) :right selected cursor)]
+      (render-column (:right layout-data) :right selected cursor db)]
 
      ;; Footer with summary statistics
      (render-footer db)]))
