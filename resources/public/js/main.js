@@ -1,5 +1,5 @@
 // DEX Frontend Code
-import { attribute } from "datastar";
+import { attribute } from "https://cdn.jsdelivr.net/gh/starfederation/datastar@1.0.0-RC.7/bundles/datastar.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 

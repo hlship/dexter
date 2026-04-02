@@ -9,7 +9,7 @@
   babashka/fs                                  {:mvn/version "0.5.32"}
   org.clj-commons/humanize                     {:mvn/version "1.2"}
   dynamic-alpha/hyper                          {:git/url "https://github.com/dynamic-alpha/hyper"
-                                                :git/sha "dd5422ddf0485d7c73bb11eff05452d1149acdfa"}
+                                                :git/sha "90bf2daad1c91313aa2eaeac38321539526795d3"}
   version-clj/version-clj                      {:mvn/version "2.0.3"}
   leiningen-core/leiningen-core                {:mvn/version "2.12.0"
                                                 :exclusions [org.slf4j/slf4j-nop]}
