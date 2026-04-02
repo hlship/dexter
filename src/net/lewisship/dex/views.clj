@@ -112,7 +112,7 @@
   The column fills its parent's height and vertically centers its boxes."
   [{:keys [boxes before after]} column selected-key cursor db]
   (let [offset-key (case column :left :left-offset :right :right-offset)]
-    [:div {:class "dep-column relative flex flex-col justify-center gap-3 w-[280px] h-full overflow-hidden"
+    [:div {:class "dep-column relative flex flex-col justify-center gap-3 w-[280px] h-full"
            :data-on:wheel__prevent__throttle.150ms
            (h/action
             (let [delta (if (pos? $scroll-delta-y) 1 -1)]
@@ -285,7 +285,8 @@
              :class "absolute inset-0 pointer-events-none"
              :width "100%"
              :height "100%"
-             :xmlns "http://www.w3.org/2000/svg"}]
+             :xmlns "http://www.w3.org/2000/svg"
+             :data-ignore-morph true}]
 
       ;; Left column: dependants
       (render-column (:left layout-data) :left selected cursor db)

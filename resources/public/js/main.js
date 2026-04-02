@@ -205,15 +205,34 @@ function drawArrows(container, connections) {
 // The draw-arrows plugin's apply() is called by Datastar after each DOM morph,
 // making it the reliable signal that layout has changed. No MutationObserver needed.
 
-const FLIP_DURATION = 300;
+const FLIP_DURATION = 500;
 const FLIP_EASING = "ease-in-out";
-const ARROW_FADE_MS = 150;
+const ARROW_FADE_MS = 100;
 
 // Snapshot of box positions from the previous render.
 let boxSnapshot = new Map();
 let isFirstRender = true;
-let pendingTimeout = null;
-let activeAnimations = [];
+let sequenceAbort = null;   // AbortController for the current animation sequence
+let activeAnimations = [];  // Web Animation objects for FLIP moves
+
+// Deferred arrow state — arrows are only drawn when no animation is active.
+// Updated each time draw-arrows apply runs; the ResizeObserver and
+// afterBoxesSettle always use these to get the latest data.
+let arrowContainer = null;
+let arrowConnections = null;
+let arrowsDirty = false;     // true if arrows need redrawing after animation
+
+function drawArrowsIfIdle() {
+  if (sequenceAbort) {
+    // Animation in progress — mark dirty so afterBoxesSettle redraws.
+    arrowsDirty = true;
+    return;
+  }
+  if (arrowContainer && arrowConnections) {
+    drawArrows(arrowContainer, arrowConnections);
+    arrowsDirty = false;
+  }
+}
 
 // Snapshot positions of all artifact boxes.
 function snapshotBoxPositions() {
@@ -225,53 +244,94 @@ function snapshotBoxPositions() {
   return positions;
 }
 
-// Cancel any in-flight FLIP animations and pending timeouts.
+// Cancel any in-flight animation sequence.
+// Aborts the AbortController (which auto-removes transitionend listeners),
+// cancels any active Web Animations, and clears inline FLIP styles so
+// boxes snap to their current DOM positions cleanly.
 function cancelPendingFlip() {
-  if (pendingTimeout) {
-    clearTimeout(pendingTimeout);
-    pendingTimeout = null;
+  if (sequenceAbort) {
+    sequenceAbort.abort();
+    sequenceAbort = null;
   }
   for (const anim of activeAnimations) {
     anim.cancel();
   }
   activeAnimations = [];
+  // Clear any lingering inline transform/opacity from applyFlipOffsets
+  document.querySelectorAll('[id^="box-"]').forEach((el) => {
+    el.style.transform = "";
+    el.style.opacity = "";
+  });
 }
 
-// FLIP animate boxes from old positions to new, fade in new boxes.
-// Returns array of Animation objects for cancellation.
-function animateBoxes(oldPositions) {
-  const anims = [];
+// Compute FLIP offsets between old and new box positions.
+// Returns a Map of element id → { el, dx, dy } for moved boxes, or
+// { el, isNew: true } for boxes that weren't in the previous snapshot.
+function computeFlipOffsets(oldPositions) {
+  const offsets = new Map();
   document.querySelectorAll('[id^="box-"]').forEach((el) => {
     const newRect = el.getBoundingClientRect();
     const old = oldPositions.get(el.id);
-
     if (old) {
       const dx = old.left - newRect.left;
       const dy = old.top - newRect.top;
       if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-        anims.push(
-          el.animate(
-            [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "translate(0, 0)" }],
-            { duration: FLIP_DURATION, easing: FLIP_EASING }
-          )
-        );
+        offsets.set(el.id, { el, dx, dy });
       }
     } else {
-      anims.push(
-        el.animate([{ opacity: 0, transform: "scale(0.95)" }, { opacity: 1, transform: "scale(1)" }], {
-          duration: FLIP_DURATION,
-          easing: FLIP_EASING,
-        })
-      );
+      offsets.set(el.id, { el, isNew: true });
     }
   });
+  return offsets;
+}
+
+// Apply FLIP offsets as inline styles so boxes visually stay at their
+// old positions. This must run synchronously before the browser paints
+// to prevent a flash of the final layout.
+function applyFlipOffsets(offsets) {
+  for (const [, entry] of offsets) {
+    if (entry.isNew) {
+      entry.el.style.opacity = "0";
+    } else {
+      entry.el.style.transform = `translate(${entry.dx}px, ${entry.dy}px)`;
+    }
+  }
+}
+
+// Animate boxes from their FLIP offsets to their final positions.
+// Returns array of Animation objects.
+function animateBoxes(offsets) {
+  const anims = [];
+  for (const [, entry] of offsets) {
+    if (entry.isNew) {
+      // Clear the inline hide so the animation can control opacity
+      entry.el.style.opacity = "";
+      anims.push(
+        entry.el.animate(
+          [{ opacity: 0, transform: "scale(0.95)" }, { opacity: 1, transform: "scale(1)" }],
+          { duration: FLIP_DURATION, easing: FLIP_EASING }
+        )
+      );
+    } else {
+      // Animation takes precedence over the inline transform while active.
+      // Clear inline style so it doesn't interfere after animation finishes.
+      entry.el.style.transform = "";
+      anims.push(
+        entry.el.animate(
+          [{ transform: `translate(${entry.dx}px, ${entry.dy}px)` }, { transform: "translate(0, 0)" }],
+          { duration: FLIP_DURATION, easing: FLIP_EASING }
+        )
+      );
+    }
+  }
   return anims;
 }
 
 // Datastar attribute plugin: data-draw-arrows="<connections-json>"
 // Called by Datastar after each DOM morph. Orchestrates:
-// 1. FLIP animation of boxes (using snapshot from previous render)
-// 2. Arrow fade-out → redraw at final positions → fade-in
+// 1. Arrow fade-out (waits for transitionend)
+// 2. FLIP animation of boxes (waits for all Animation.finished promises)
+// 3. Arrow redraw at final positions → fade-in
 attribute({
   name: "draw-arrows",
   keyReq: "denied",
@@ -285,52 +345,95 @@ attribute({
       return () => {};
     }
 
+    // Update deferred arrow state with latest connections data.
+    // The SVG has data-ignore-morph so its children (arrow paths) survive
+    // the morph — old arrows can be faded out without redrawing.
+    arrowContainer = el;
+    arrowConnections = connections;
+
     const svg = el.querySelector("#arrow-overlay");
 
     if (isFirstRender) {
       // First render: just draw arrows immediately, take initial snapshot
       isFirstRender = false;
       requestAnimationFrame(() => {
-        drawArrows(el, connections);
+        drawArrowsIfIdle();
         boxSnapshot = snapshotBoxPositions();
       });
     } else {
       // Cancel any in-flight animation from a previous rapid click
       cancelPendingFlip();
 
-      // Capture old positions, then immediately update snapshot to current
-      // DOM positions so the next rapid click animates from here, not from
-      // two renders ago.
+      // Capture old positions, then snapshot current (new) positions.
+      // snapshotBoxPositions() forces a reflow so getBoundingClientRect
+      // returns the post-morph layout.
       const oldPositions = boxSnapshot;
       boxSnapshot = snapshotBoxPositions();
 
-      // Fade out arrows immediately
+      // Compute FLIP offsets and apply them as inline styles immediately
+      // (before the browser paints) so boxes visually stay at their old
+      // positions. This prevents a flash of the final layout.
+      const flipOffsets = computeFlipOffsets(oldPositions);
+      applyFlipOffsets(flipOffsets);
+
+      // Create an AbortController for this sequence. Its signal is passed
+      // to addEventListener (auto-removes listeners on abort) and checked
+      // between async steps to bail out if a new click has cancelled us.
+      const abort = new AbortController();
+      const { signal } = abort;
+      sequenceAbort = abort;
+
+      // --- Step 1: Fade out old arrows ---
       if (svg) {
         svg.style.transition = `opacity ${ARROW_FADE_MS}ms ease-in-out`;
         svg.style.opacity = "0";
       }
 
-      // FLIP animate boxes from old positions to new
-      requestAnimationFrame(() => {
-        activeAnimations = animateBoxes(oldPositions);
+      // Wait for the CSS transition to finish, then run steps 2–3.
+      // If svg is absent or already invisible, skip straight to boxes.
+      const needsFade = svg && getComputedStyle(svg).opacity !== "0";
 
-        // After boxes settle, redraw arrows at final positions and fade in
-        pendingTimeout = setTimeout(() => {
-          pendingTimeout = null;
-          activeAnimations = [];
-          drawArrows(el, connections);
-          if (svg) {
-            svg.style.opacity = "1";
-          }
-          // Update snapshot to final settled positions
-          boxSnapshot = snapshotBoxPositions();
-        }, FLIP_DURATION);
-      });
+      const afterFadeOut = () => {
+        if (signal.aborted) return;
+
+        // --- Step 2: FLIP animate boxes from old to new positions ---
+        activeAnimations = animateBoxes(flipOffsets);
+
+        if (activeAnimations.length === 0) {
+          afterBoxesSettle();
+          return;
+        }
+
+        Promise.all(activeAnimations.map((a) => a.finished))
+          .then(afterBoxesSettle)
+          .catch(() => {}); // animations were cancelled — ignore
+      };
+
+      const afterBoxesSettle = () => {
+        if (signal.aborted) return;
+        sequenceAbort = null;
+        activeAnimations = [];
+
+        // --- Step 3: Draw arrows at final positions with latest data ---
+        drawArrowsIfIdle();
+        if (svg) {
+          svg.style.opacity = "1";
+        }
+        boxSnapshot = snapshotBoxPositions();
+      };
+
+      if (needsFade) {
+        svg.addEventListener("transitionend", afterFadeOut, { once: true, signal });
+      } else {
+        requestAnimationFrame(afterFadeOut);
+      }
     }
 
-    // Redraw on window resize (no animation needed)
+    // Redraw on window resize (no animation needed).
+    // drawArrowsIfIdle is a no-op during animation sequences, and
+    // afterBoxesSettle will redraw with latest data when the sequence ends.
     const resizeObserver = new ResizeObserver(() => {
-      requestAnimationFrame(() => drawArrows(el, connections));
+      requestAnimationFrame(drawArrowsIfIdle);
     });
     resizeObserver.observe(el);
 
