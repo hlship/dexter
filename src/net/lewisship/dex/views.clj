@@ -91,21 +91,28 @@
    [:div {:class "text-xs text-slate-500"} version]])
 
 (defn- render-overflow-indicator
-  "Renders a clickable 'N more above/below' indicator for windowed columns.
-  scroll-action is a Datastar expression string returned by h/action."
+  "Renders an 'N more above/below' indicator for windowed columns.
+  Always present in the layout (to reserve stable vertical space), but
+  text is transparent and clicks are disabled when there are no overflow items."
   [n direction scroll-action]
-  (when (pos? n)
-    [:div {:class "text-center text-xs text-slate-400 py-1 cursor-pointer
-                            hover:text-blue-500 transition-colors"
-           :data-on:click scroll-action}
-     (str (case direction :up "▲ " :down "▼ ") n " more")]))
+  (let [active? (pos? n)]
+    [:div {:class (str "text-center text-xs py-1 "
+                       (if active?
+                         "text-slate-400 cursor-pointer hover:text-blue-500 transition-colors"
+                         "text-transparent select-none"))
+           :data-on:click (when active? scroll-action)}
+     ;; Always render text content so the element keeps its intrinsic height.
+     ;; Unicode arrows + "N more" when active; a non-breaking space placeholder when not.
+     (if active?
+       (str (case direction :up "▲ " :down "▼ ") n " more")
+       "\u00a0")]))
 
 (defn- render-column
   "Renders a column of artifact boxes with optional overflow indicators.
   The column fills its parent's height and vertically centers its boxes."
   [{:keys [boxes before after]} column selected-key cursor db]
   (let [offset-key (case column :left :left-offset :right :right-offset)]
-    [:div {:class "relative flex flex-col justify-center gap-3 w-[280px] h-full"
+    [:div {:class "dep-column relative flex flex-col justify-center gap-3 w-[280px] h-full overflow-hidden"
            :data-on:wheel__prevent__throttle.150ms
            (h/action
             (let [delta (if (pos? $scroll-delta-y) 1 -1)]

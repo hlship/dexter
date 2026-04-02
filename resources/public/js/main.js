@@ -348,12 +348,51 @@ attribute({
  * and dispatches a 'change' event so that a data-on:change handler can
  * send the new max-visible to the server.
  *
- * Box dimensions must stay in sync with Tailwind classes on rendered boxes:
- *   box height ≈ 56px (px-4 py-2, two text lines, border-2)
- *   gap = 12px (gap-3)
+ * Dynamically measures a .dep-column element (left or right side column)
+ * to read the actual rendered box height, gap, and overflow-indicator
+ * overhead. Overflow indicators are always present in the DOM (rendered
+ * with transparent text when inactive) so the layout is stable.
+ *
+ * Fallback constants are used only before any columns have been rendered.
  */
-const BOX_SLOT_HEIGHT = 68; // box + gap
-const COLUMN_PADDING = 40;  // vertical padding/margin in column
+const FALLBACK_BOX_SLOT_HEIGHT = 68; // box + gap fallback
+const FALLBACK_COLUMN_PADDING = 40;  // vertical padding/margin fallback
+
+/**
+ * Measures column layout metrics from a rendered .dep-column element.
+ *
+ * Looks for a side column (which always has two overflow-indicator children
+ * plus zero or more box children), measures a box's height, the column gap,
+ * and the total space consumed by the indicators.
+ *
+ * Returns { boxHeight, gap, overhead } or null if no measurable column exists.
+ */
+function measureColumnMetrics(container) {
+  // Find a box inside a .dep-column, then navigate to its parent column.
+  // This avoids picking an empty column (e.g. the left column at ROOT
+  // which has no dependants — only two empty overflow indicators).
+  const box = container.querySelector(".dep-column [id^='box-']");
+  if (!box) return null;
+
+  const column = box.closest(".dep-column");
+  if (!column) return null;
+
+  const boxHeight = box.getBoundingClientRect().height;
+  if (boxHeight <= 0) return null;
+
+  const gap = parseFloat(getComputedStyle(column).rowGap) || 0;
+
+  // Measure non-box children (the always-present overflow indicators).
+  // Each indicator's height + one gap between it and the adjacent box.
+  let overhead = 0;
+  for (const child of column.children) {
+    if (!child.id || !child.id.startsWith("box-")) {
+      overhead += child.getBoundingClientRect().height + gap;
+    }
+  }
+
+  return { boxHeight, gap, overhead };
+}
 
 attribute({
   name: "track-height",
@@ -363,8 +402,28 @@ attribute({
     let lastMaxVisible = -1;
 
     function onResize() {
+      // Use the observed container's clientHeight as the available height.
+      // This is always accurate because the ResizeObserver tracks this
+      // element, and its height is set by flex-1 + min-h-0 — a definite
+      // size. We do NOT use the column's clientHeight because Firefox
+      // doesn't always resolve h-full to a definite value inside a
+      // flex-row container whose height comes from flex-1.
       const height = el.clientHeight;
-      const mv = Math.max(1, Math.floor((height - COLUMN_PADDING) / BOX_SLOT_HEIGHT));
+      const metrics = measureColumnMetrics(el);
+
+      let mv;
+      if (metrics) {
+        // N boxes with gap between them need:
+        //   N * boxHeight + (N - 1) * gap  =  N * (boxHeight + gap) - gap
+        // Available space for boxes = height - overhead.
+        // Solving: N ≤ (available + gap) / (boxHeight + gap)
+        const available = height - metrics.overhead;
+        const slot = metrics.boxHeight + metrics.gap;
+        mv = Math.max(1, Math.floor((available + metrics.gap) / slot));
+      } else {
+        mv = Math.max(1, Math.floor((height - FALLBACK_COLUMN_PADDING) / FALLBACK_BOX_SLOT_HEIGHT));
+      }
+
       if (mv !== lastMaxVisible) {
         lastMaxVisible = mv;
         el.value = String(mv);
@@ -372,12 +431,14 @@ attribute({
       }
     }
 
-    // Initial computation (deferred to let layout settle)
-    requestAnimationFrame(onResize);
+    // Initial computation — double-rAF ensures the morphed DOM has been
+    // fully laid out in all browsers. Firefox sometimes needs the extra
+    // frame before flex children have their final computed sizes.
+    requestAnimationFrame(() => requestAnimationFrame(onResize));
 
-    const observer = new ResizeObserver(() => {
-      requestAnimationFrame(onResize);
-    });
+    // ResizeObserver fires after layout, so measurements are already
+    // accurate — no need to defer with requestAnimationFrame.
+    const observer = new ResizeObserver(onResize);
     observer.observe(el);
 
     return () => observer.disconnect();
