@@ -263,7 +263,7 @@
      ;; Content area fills remaining space, centers the graph
      ;; data-draw-arrows passes connection JSON to the client-side arrow plugin
      [:div {:id "dep-viewer"
-            :class "flex-1 relative flex justify-center gap-[120px] overflow-auto"
+            :class "flex-1 min-h-0 relative flex justify-center gap-[120px] overflow-auto"
             :data-draw-arrows (connections->json (:connections layout-data)
                                                  (:id (:selected-box layout-data)))
             :data-track-height "true"
