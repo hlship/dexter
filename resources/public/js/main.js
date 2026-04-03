@@ -557,8 +557,12 @@ attribute({
  *
  * Suppressed when a modal is open or the element has the disabled attribute.
  *
+ * Requires the classes 'tooltip' and the attribute
+ * 'data-preserve-attr' as 'data-tip' (because client-side modification
+ * would get overwritten). 
+ *
  * Usage in Hiccup:
- *   :data-accel "s"           ;; Cmd/Ctrl+S triggers el.click()
+ *   :data-accel "s"           ;; Cmd/Ctrl+S triggers el.click() or el.focus()
  *   :data-accel "z"           ;; Cmd/Ctrl+Z
  *   :data-accel__shift "z"    ;; Cmd/Ctrl+Shift+Z
  */
@@ -571,7 +575,11 @@ attribute({
   apply({ el, value, mods }) {
     const accelKey = value;
     const needsShift = mods.has('shift');
-
+    
+    // Set DaisyUI tooltip showing the shortcut, e.g. "⌘S" or "Ctrl+Shift+Z"
+    const label = modSymbol + (needsShift ? (isMac ? '⇧' : 'Shift+') : '') + accelKey.toUpperCase();
+    el.setAttribute('data-tip', label);
+   
     const handler = (e) => {
       if (!(e.metaKey || e.ctrlKey)) return;
       if (e.key !== accelKey) return;
@@ -579,12 +587,11 @@ attribute({
       if (el.hasAttribute('disabled')) return;
       if (document.querySelector('#modal-container > *')) return;
       e.preventDefault();
-      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
-        el.focus();
-        el.select();
-      } else {
-        el.click();
-      }
+       
+      if (el.type === "text") 
+        { el.focus(); }
+      else 
+        { el.click(); }
     };
 
     window.addEventListener('keydown', handler, true);

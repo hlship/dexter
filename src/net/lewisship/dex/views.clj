@@ -27,8 +27,8 @@
              (fn [state]
                (-> state
                    (update :nav-history (fnil conj [])
-                           {:selected (:selected state)
-                            :left-offset (:left-offset state)
+                           {:selected     (:selected state)
+                            :left-offset  (:left-offset state)
                             :right-offset (:right-offset state)})
                    (assoc :selected artifact-key
                           :left-offset 0
@@ -186,34 +186,29 @@
         has-history? (seq history)]
     [:div {:class "bg-white border-b border-slate-200 shadow-sm px-4 py-2 flex items-center gap-4 shrink-0"}
      ;; Home button
-     [:button {:class (str "p-2 rounded-lg transition-colors "
-                           (if (= selected 'ROOT)
-                             "text-slate-300 cursor-default"
-                             "text-slate-600 hover:bg-slate-100 hover:text-blue-600"))
-               :title "Go to root"
-               :data-accel "h"
-               :data-on:click (h/action
-                               (navigate! cursor 'ROOT))}
+     [:button.btn.btn-square.tooltip.tooltip-bottom
+      {:disabled           (= selected 'ROOT)
+       :data-accel         "h"
+       :data-preserve-attr "data-tip"
+       :data-on:click      (h/action
+                             (navigate! cursor 'ROOT))}
       ;; Home icon (SVG)
       [:svg {:class "w-5 h-5" :viewBox "0 0 20 20" :fill "currentColor"
              :xmlns "http://www.w3.org/2000/svg"}
        [:path {:fill-rule "evenodd" :clip-rule "evenodd"
-               :d "M9.293 2.293a1 1 0 011.414 0l7 7A1 1 0 0117 11h-1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-3a1 1 0 00-1-1H9a1 1 0 00-1 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-6H3a1 1 0 01-.707-1.707l7-7z"}]]]
+               :d         "M9.293 2.293a1 1 0 011.414 0l7 7A1 1 0 0117 11h-1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-3a1 1 0 00-1-1H9a1 1 0 00-1 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-6H3a1 1 0 01-.707-1.707l7-7z"}]]]
      ;; Back button
-     [:button {:class (str "p-2 rounded-lg transition-colors "
-                           (if has-history?
-                             "text-slate-600 hover:bg-slate-100 hover:text-blue-600"
-                             "text-slate-300 cursor-default"))
-               :title "Go back"
-               :disabled (not has-history?)
-               :data-accel "b"
-               :data-on:click (h/action
-                               (navigate-back! cursor))}
+     [:button.btn.btn-square.tooltip.tooltip-bottom
+      {:disabled           (not has-history?)
+       :data-accel         "b"
+       :data-preserve-attr "data-tip"
+       :data-on:click      (h/action
+                             (navigate-back! cursor))}
       ;; Back arrow icon (SVG) — arrow-left
       [:svg {:class "w-5 h-5" :viewBox "0 0 20 20" :fill "currentColor"
              :xmlns "http://www.w3.org/2000/svg"}
        [:path {:fill-rule "evenodd" :clip-rule "evenodd"
-               :d "M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z"}]]]
+               :d         "M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z"}]]]
      ;; Current selection label
      [:span {:class "text-sm text-slate-500"}
       (:label (deps/artifact-info db selected))]
@@ -221,30 +216,32 @@
      [:div {:class "flex-1"}]
      ;; Artifact search
      (let [search (h/tab-cursor :search "")]
-       [:div {:class "relative"}
-        [:input {:id "artifact-search"
-                 :class "w-64 px-3 py-1.5 text-sm border border-slate-300 rounded-lg
+       [:div.relative
+        ;; NOTE: No accelerator tooltip for the text field because it would be active
+        ;; anytime the field was focused, which is too much.
+        [:input {:id             "artifact-search"
+                 :class          "w-64 px-3 py-1.5 text-sm border border-slate-300 rounded-lg
                          focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400"
-                 :type "text"
-                 :placeholder "Search artifact..."
-                 :data-accel "f"
-                 :list "artifact-list"
-                 :value @search
+                 :type           "text"
+                 :placeholder    "Search artifact..."
+                 :data-accel     "f"
+                 :list           "artifact-list"
+                 :value          @search
                  ;; Idiomorph preserves focused input values, so we need both:
                  ;; - server-side reset! to keep cursor state clean
                  ;; - client-side el.value/blur to clear the visible input immediately
                  :data-on:change (str (h/action
-                                       (when-let [k (deps/find-artifact db $value)]
-                                         (navigate! cursor k))
-                                       (reset! search ""))
+                                        (when-let [k (deps/find-artifact db $value)]
+                                          (navigate! cursor k))
+                                        (reset! search ""))
                                       "; el.value = ''; el.blur()")
                  ;; Enter: find first substring match and navigate to it
                  :data-on:keydown
                  (str "if (evt.key !== 'Enter') return; evt.preventDefault(); "
                       (h/action
-                       (when-let [found (deps/find-artifact db $value)]
-                         (navigate! cursor found))
-                       (reset! search ""))
+                        (when-let [found (deps/find-artifact db $value)]
+                          (navigate! cursor found))
+                        (reset! search ""))
                       "; el.value = ''; el.blur()")}]
         ;; Datalist provides browser-native autocomplete using artifact labels
         [:datalist {:id "artifact-list"}
@@ -253,8 +250,8 @@
            [:option {:value label}])]])]))
 
 (defn home-page [req]
-  (let [db (:db @(:hyper/app-state req))
-        cursor (h/tab-cursor :view {:selected 'ROOT
+  (let [db          (:db @(:hyper/app-state req))
+        cursor      (h/tab-cursor :view {:selected 'ROOT
                                     :left-offset 0
                                     :right-offset 0
                                     :nav-history []

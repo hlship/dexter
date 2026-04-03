@@ -23,7 +23,9 @@
    :datastar-script [:script {:type "module"
                               :src "/js/main.js"}]
    :head [[:link {:rel "icon" :type "image/svg+xml" :href "/favicon.svg"}]
-          [:link {:rel "stylesheet" :href "/style.css"}]]))
+          [:link {:rel "stylesheet" :href "/style.css"}]
+          ;; DaisyUI
+          [:script {:src "/js/browser.js"}]]))
 
 (defonce *app (atom nil))
 
