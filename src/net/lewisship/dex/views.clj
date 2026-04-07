@@ -223,7 +223,7 @@
                  :class          "w-64 px-3 py-1.5 text-sm border border-slate-300 rounded-lg
                          focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400"
                  :type           "text"
-                 :placeholder    "Search artifact..."
+                 :placeholder    "Search..."
                  :data-accel     "f"
                  :list           "artifact-list"
                  :value          @search
@@ -297,4 +297,11 @@
       (render-column (:right layout-data) :right selected cursor db)]
 
      ;; Footer with summary statistics
-     (render-footer db)]))
+     (render-footer db)
+
+     ;; Hidden modal — activated by client-side JS when the server disconnects
+     [:div {:id "modal-container"}
+      [:div {:id "disconnect-modal" :class "modal"}
+       [:div {:class "modal-box text-center"}
+        [:p {:class "text-lg"} "You may close this window now."]]
+       [:div {:class "modal-backdrop"}]]]]))

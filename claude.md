@@ -10,7 +10,7 @@ Interactive browser-based tool for exploring JVM dependency graphs. Resolves dep
 
 **Server (Clojure):** Hyper framework (`dynamic-alpha/hyper`) provides server-side rendering with live updates via SSE. Datastar on the client handles DOM morphing and reactivity via `data-*` attributes.
 
-**Client (JS):** A single ES module (`resources/public/js/main.js`) with three Datastar `attribute` plugins: `data-draw-arrows` (SVG arrows + FLIP animation), `data-track-height` (viewport sizing), and `data-accel` (keyboard shortcuts).
+**Client (JS):** A single ES module (`resources/public/js/main.js`) with three Datastar `attribute` plugins: `data-draw-arrows` (SVG arrows + FLIP animation), `data-track-height` (viewport sizing), and `data-accel` (keyboard shortcuts). Also includes a `datastar-fetch` event listener for server disconnect detection (see below).
 
 **CSS:** Tailwind CSS v4 — source at `public/style.css`, built via `bb tailwind` into `generated-resources/public/style.css`.
 
@@ -67,6 +67,7 @@ Special key `'ROOT` represents the project itself.
 - **SVG arrows:** Drawn client-side via `data-draw-arrows` plugin. Connection data (including version-match colors) is serialized to JSON by the server.
 - **FLIP animation:** Box transitions use the Web Animations API. The `data-draw-arrows` plugin's `apply()` callback serves as the morph signal — no MutationObserver needed.
 - **Version compatibility:** Classified by `layout/version-match` using `version-clj`: exact (black), compatible (green), incompatible (red), unknown/git-sha (yellow).
+- **Server disconnect modal:** A DaisyUI modal (`#disconnect-modal` inside `#modal-container`) is rendered hidden in the page by `home-page`. Client-side JS listens for Datastar's `datastar-fetch` custom events; on `"retrying"` or `"retries-failed"` it adds the `modal-open` class to show the modal with "You may close this window now." The `data-accel` plugin checks `#modal-container > *` to suppress keyboard shortcuts when any modal is visible.
 
 ## Running
 

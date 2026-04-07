@@ -599,4 +599,24 @@ attribute({
   }
 });
 
+// --- Server Disconnect Detection ---
+// Datastar dispatches "datastar-fetch" custom events on document with
+// detail.type indicating the lifecycle stage. When the server stops,
+// Datastar retries the SSE connection with exponential backoff. We show
+// the disconnect modal on the first retry attempt rather than waiting
+// for all 10 retries to exhaust (~3 minutes).
+//
+// The modal markup lives in the Hiccup template (views.clj) inside
+// #modal-container. The data-accel plugin already checks for
+// '#modal-container > *' to suppress keyboard shortcuts when a modal
+// is visible.
+
+document.addEventListener("datastar-fetch", (e) => {
+  const { type } = e.detail;
+
+  if (type === "retrying" || type === "retries-failed") {
+    document.getElementById("disconnect-modal")?.classList.add("modal-open");
+  }
+});
+
 console.log("DEX Frontend Loaded");
