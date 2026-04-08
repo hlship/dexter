@@ -1,7 +1,6 @@
 (ns net.lewisship.dex.service
   "HTTP server lifecycle: routes, handler, start/stop."
-  (:require [cheshire.core :as json]
-            [hyper.core :as h]
+  (:require [hyper.core :as h]
             [hyper.state :as state]
             [net.lewisship.dex.views :as views]))
 
