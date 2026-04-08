@@ -14,40 +14,106 @@
 (alter-var-root #'h/client-param-registry
                 assoc '$scroll-delta-y {:js "evt.deltaY" :key "scrollDeltaY"})
 
+;; --- Tab & View State Helpers ---
+
+(defn- active-view
+  "Returns the view map for the currently active tab."
+  [state]
+  (get-in state [:views (:active-tab state)]))
+
+(defn- update-active-view
+  "Applies f to the active tab's view map within the full state."
+  [state f]
+  (update-in state [:views (:active-tab state)] f))
+
+(defn- active-tab-root
+  "Returns the root artifact key for the active tab."
+  [state]
+  (let [active-id (:active-tab state)]
+    (:root (some #(when (= (:id %) active-id) %) (:tabs state)))))
+
+(defn- tab-root-set
+  "Returns a set of all artifact keys that are roots of open tabs."
+  [state]
+  (into #{} (map :root) (:tabs state)))
+
 ;; --- Navigation History ---
 
 (defn- navigate!
   "Pushes the current view state onto :nav-history, then navigates to the
   given artifact key with offsets reset to 0. No-op if already viewing
-  the target artifact."
+  the target artifact. Operates on the active tab's view."
   [cursor artifact-key]
-  (let [{:keys [selected]} @cursor]
-    (when (not= selected artifact-key)
-      (swap! cursor
-             (fn [state]
-               (-> state
+  (let [view (active-view @cursor)]
+    (when (not= (:selected view) artifact-key)
+      (swap! cursor update-active-view
+             (fn [view]
+               (-> view
                    (update :nav-history (fnil conj [])
-                           {:selected     (:selected state)
-                            :left-offset  (:left-offset state)
-                            :right-offset (:right-offset state)})
+                           {:selected     (:selected view)
+                            :left-offset  (:left-offset view)
+                            :right-offset (:right-offset view)})
                    (assoc :selected artifact-key
                           :left-offset 0
                           :right-offset 0)))))))
 
 (defn- navigate-back!
   "Pops the most recent entry from :nav-history and restores its state.
-  No-op if history is empty."
+  No-op if history is empty. Operates on the active tab's view."
   [cursor]
-  (let [history (:nav-history @cursor)]
-    (when (seq history)
-      (let [prev (peek history)]
-        (swap! cursor
-               (fn [state]
-                 (-> state
+  (let [view (active-view @cursor)]
+    (when (seq (:nav-history view))
+      (swap! cursor update-active-view
+             (fn [view]
+               (let [prev (peek (:nav-history view))]
+                 (-> view
                      (assoc :selected (:selected prev)
                             :left-offset (:left-offset prev)
                             :right-offset (:right-offset prev))
                      (update :nav-history pop))))))))
+
+;; --- Tab Management ---
+
+(defn- open-tab!
+  "Creates a new tab rooted at the given artifact, switches to it."
+  [cursor db artifact-key]
+  (swap! cursor
+         (fn [state]
+           (let [id    (:next-id state)
+                 label (:label (deps/artifact-info db artifact-key))]
+             (-> state
+                 (update :tabs conj {:id id :root artifact-key :label label})
+                 (assoc-in [:views id] {:selected     artifact-key
+                                        :left-offset  0
+                                        :right-offset 0
+                                        :nav-history  []})
+                 (assoc :active-tab id)
+                 (update :next-id inc)
+                 (update :tab-history conj id))))))
+
+(defn- close-tab!
+  "Closes a tab (must not be the ROOT tab, id 0). Selects the most
+  recently viewed remaining tab."
+  [cursor tab-id]
+  (swap! cursor
+         (fn [state]
+           (let [history' (into [] (remove #{tab-id}) (:tab-history state))
+                 new-active (or (peek history') 0)]
+             (-> state
+                 (update :tabs (fn [tabs] (into [] (remove #(= (:id %) tab-id)) tabs)))
+                 (update :views dissoc tab-id)
+                 (assoc :tab-history history'
+                        :active-tab new-active))))))
+
+(defn- select-tab!
+  "Switches to the given tab, updating the tab-history for recency tracking."
+  [cursor tab-id]
+  (swap! cursor
+         (fn [state]
+           (-> state
+               (assoc :active-tab tab-id)
+               (update :tab-history
+                       (fn [h] (conj (into [] (remove #{tab-id}) h) tab-id)))))))
 
 ;; --- Column Scrolling ---
 
@@ -56,7 +122,10 @@
   clamping to [0, total - max-visible].  `column-key` is the layout key
   (:left or :right) used to look up the windowed column data."
   [db cursor column-key delta]
-  (let [{:keys [selected left-offset right-offset hidden-libs max-visible]} @cursor
+  (let [state @cursor
+        view  (active-view state)
+        {:keys [selected left-offset right-offset]} view
+        {:keys [hidden-libs max-visible]} state
         layout-data (layout/compute-layout db selected left-offset right-offset
                                            hidden-libs max-visible)
         {:keys [total]} (get layout-data column-key)
@@ -70,11 +139,13 @@
 (defn- render-box
   "Renders a single artifact box as a Tailwind-styled div.
   select-action is a Datastar expression string returned by h/action.
+  open-tab-action, when non-nil, renders a small icon in the upper-left
+  corner to open a new tab rooted at this artifact.
   Leaf nodes (no dependencies) are annotated with a grey right border marker.
   Dependencies with version mismatches get a colored right border."
-  [{:keys [key name version leaf? version-color]} selected? select-action]
+  [{:keys [key name version leaf? version-color]} selected? select-action open-tab-action]
   [:div {:id (str "box-" key)
-         :class (str "w-full px-4 py-2 rounded-lg border-2 cursor-pointer "
+         :class (str "group w-full rounded-lg border-2 cursor-pointer "
                      "transition-colors duration-150 "
                      (if selected?
                        "border-blue-500 bg-blue-50 shadow-md"
@@ -87,8 +158,30 @@
          :style (when version-color
                   (str "border-right-color: " version-color))
          :data-on:click select-action}
-   [:div {:class "font-semibold text-sm text-slate-800 truncate" :title name} name]
-   [:div {:class "text-xs text-slate-500"} version]])
+   ;; Flex row: text content on the left, optional open-tab button on the right.
+   ;; The button is in the content flow so it aligns consistently regardless
+   ;; of right border width. The group class enables group-hover on the button.
+   [:div {:class (str "flex items-start gap-1 pl-4 py-2 "
+                      ;; Compensate for the 8px difference between border-r-[10px]
+                      ;; (annotated) and border-2 (normal) so that content width —
+                      ;; and thus the open-tab button — aligns across all boxes.
+                      (if (or version-color leaf?) "pr-4" "pr-6"))}
+    [:div {:class "flex-1 min-w-0"}
+     [:div {:class "font-semibold text-sm text-slate-800 truncate" :title name} name]
+     [:div {:class "text-xs text-slate-500"} version]]
+    (when open-tab-action
+      [:button {:class (str "shrink-0 w-5 h-5 -mt-1.5 -mr-3 rounded-full bg-white border "
+                            "border-slate-300 flex items-center justify-center shadow-sm "
+                            "text-slate-400 cursor-pointer "
+                            "opacity-0 group-hover:opacity-100 "
+                            "hover:text-blue-500 hover:border-blue-400 transition-all")
+                :title "Open in new tab"
+                :data-on:click__stop open-tab-action}
+       ;; Plus icon
+       [:svg {:class "w-3 h-3" :viewBox "0 0 12 12" :fill "none"
+              :stroke "currentColor" :stroke-width "2" :stroke-linecap "round"
+              :xmlns "http://www.w3.org/2000/svg"}
+        [:path {:d "M6 2v8M2 6h8"}]]])]])
 
 (defn- render-overflow-indicator
   "Renders an 'N more above/below' indicator for windowed columns.
@@ -109,27 +202,35 @@
 
 (defn- render-column
   "Renders a column of artifact boxes with optional overflow indicators.
-  The column fills its parent's height and vertically centers its boxes."
-  [{:keys [boxes before after]} column selected-key cursor db]
+  The column fills its parent's height and vertically centers its boxes.
+  tab-roots is a set of artifact keys that already have tabs."
+  [{:keys [boxes before after]} column selected-key cursor db tab-roots]
   (let [offset-key (case column :left :left-offset :right :right-offset)]
     [:div {:class "dep-column relative flex flex-col justify-center gap-3 w-[280px] h-full"
            :data-on:wheel__prevent__throttle.150ms
            (h/action
             (let [delta (if (pos? $scroll-delta-y) 1 -1)]
-              (swap! cursor update offset-key
-                     (scroll-offset db cursor column delta))))}
+              (swap! cursor update-active-view
+                     (fn [view]
+                       (update view offset-key
+                               (scroll-offset db cursor column delta))))))}
      (render-overflow-indicator
       before :up
-      (h/action (swap! cursor update offset-key
-                       (scroll-offset db cursor column -1))))
+      (h/action (swap! cursor update-active-view
+                       (fn [view]
+                         (update view offset-key
+                                 (scroll-offset db cursor column -1))))))
      (for [box boxes]
        (render-box box (= (:key box) selected-key)
-                   (h/action
-                    (navigate! cursor (:key box)))))
+                   (h/action (navigate! cursor (:key box)))
+                   (when-not (tab-roots (:key box))
+                     (h/action (open-tab! cursor db (:key box))))))
      (render-overflow-indicator
       after :down
-      (h/action (swap! cursor update offset-key
-                       (scroll-offset db cursor column 1))))]))
+      (h/action (swap! cursor update-active-view
+                       (fn [view]
+                         (update view offset-key
+                                 (scroll-offset db cursor column 1))))))]))
 
 ;; --- Connection Data ---
 
@@ -179,44 +280,77 @@
 
 ;; --- Page Rendering ---
 
+(defn- render-tab
+  "Renders a single tab button. The ROOT tab (id 0) has no close button."
+  [cursor {:keys [id label]} active?]
+  [:div {:class (str "flex items-center gap-1 px-3 py-1 text-sm rounded-t border-b-2 "
+                     "whitespace-nowrap cursor-pointer select-none "
+                     (if active?
+                       "border-blue-500 bg-blue-50 text-blue-700 font-semibold"
+                       "border-transparent text-slate-500 hover:text-blue-500 hover:bg-slate-50"))
+         :data-on:click (h/action (select-tab! cursor id))}
+   [:span label]
+   ;; Close button (not for root tab)
+   (when (pos? id)
+     [:button {:class (str "ml-1 w-4 h-4 rounded-full text-xs leading-none "
+                           "flex items-center justify-center "
+                           "hover:bg-red-100 hover:text-red-600 transition-colors")
+               :title "Close tab"
+               :data-on:click__stop (h/action (close-tab! cursor id))}
+      "×"])])
+
 (defn- render-toolbar
-  "Renders the top toolbar with navigation controls and artifact search."
-  [cursor selected db]
-  (let [history (:nav-history @cursor)
-        has-history? (seq history)]
-    [:div {:class "bg-white border-b border-slate-200 shadow-sm px-4 py-2 flex items-center gap-4 shrink-0"}
-     ;; Home button
-     [:button.btn.btn-square.tooltip.tooltip-bottom
-      {:disabled           (= selected 'ROOT)
+  "Renders the top toolbar with navigation controls, tabs, and artifact search."
+  [cursor db]
+  (let [state     @cursor
+        view      (active-view state)
+        tab-root  (active-tab-root state)
+        selected  (:selected view)
+        tabs      (:tabs state)
+        active-id (:active-tab state)]
+    [:div {:class "bg-white border-b border-slate-200 shadow-sm px-4 py-2 flex items-center gap-3 shrink-0"}
+     ;; Home button — navigates to the root artifact of the active tab
+     [:button.btn.btn-square.btn-sm.tooltip.tooltip-bottom
+      {:disabled           (= selected tab-root)
        :data-accel         "h"
        :data-preserve-attr "data-tip"
        :data-on:click      (h/action
-                             (navigate! cursor 'ROOT))}
+                             (let [root (active-tab-root @cursor)]
+                               (navigate! cursor root)))}
       ;; Home icon (SVG)
       [:svg {:class "w-5 h-5" :viewBox "0 0 20 20" :fill "currentColor"
              :xmlns "http://www.w3.org/2000/svg"}
        [:path {:fill-rule "evenodd" :clip-rule "evenodd"
                :d         "M9.293 2.293a1 1 0 011.414 0l7 7A1 1 0 0117 11h-1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-3a1 1 0 00-1-1H9a1 1 0 00-1 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-6H3a1 1 0 01-.707-1.707l7-7z"}]]]
-     ;; Back button
-     [:button.btn.btn-square.tooltip.tooltip-bottom
-      {:disabled           (not has-history?)
+     ;; Back button — per-tab navigation history
+     [:button.btn.btn-square.btn-sm.tooltip.tooltip-bottom
+      {:disabled           (empty? (:nav-history view))
        :data-accel         "b"
        :data-preserve-attr "data-tip"
        :data-on:click      (h/action
                              (navigate-back! cursor))}
-      ;; Back arrow icon (SVG) — arrow-left
+      ;; Back arrow icon (SVG)
       [:svg {:class "w-5 h-5" :viewBox "0 0 20 20" :fill "currentColor"
              :xmlns "http://www.w3.org/2000/svg"}
        [:path {:fill-rule "evenodd" :clip-rule "evenodd"
                :d         "M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z"}]]]
-     ;; Current selection label
-     [:span {:class "text-sm text-slate-500"}
-      (:label (deps/artifact-info db selected))]
-     ;; Spacer
-     [:div {:class "flex-1"}]
+
+     ;; Separator
+     [:div {:class "w-px h-6 bg-slate-200"}]
+
+     ;; Tabs — ROOT tab is fixed, others scroll horizontally
+     [:div {:class "flex items-center gap-1 min-w-0 flex-1"}
+      ;; ROOT tab (always visible, never scrolls)
+      (render-tab cursor (first tabs) (zero? active-id))
+      ;; Other tabs in a scrollable container
+      (when (> (count tabs) 1)
+        [:div {:class "flex items-center gap-1 overflow-x-auto min-w-0"}
+         (for [tab (rest tabs)]
+           (render-tab cursor tab (= (:id tab) active-id)))])]
+
      ;; Artifact search
      (let [search (h/tab-cursor :search "")]
-       [:div.relative
+       [:div.relative.shrink-0
         ;; NOTE: No accelerator tooltip for the text field because it would be active
         ;; anytime the field was focused, which is too much.
         [:input {:id             "artifact-search"
@@ -251,13 +385,23 @@
 
 (defn home-page [req]
   (let [db          (:db @(:hyper/app-state req))
-        cursor      (h/tab-cursor :view {:selected 'ROOT
-                                    :left-offset 0
-                                    :right-offset 0
-                                    :nav-history []
-                                    :hidden-libs layout/default-hidden-libs
-                                    :max-visible nil})
-        {:keys [selected left-offset right-offset hidden-libs max-visible]} @cursor
+        root-label  (:label (deps/artifact-info db 'ROOT))
+        cursor      (h/tab-cursor :view
+                                  {:tabs        [{:id 0 :root 'ROOT :label root-label}]
+                                   :active-tab  0
+                                   :next-id     1
+                                   :tab-history [0]
+                                   :views       {0 {:selected     'ROOT
+                                                    :left-offset  0
+                                                    :right-offset 0
+                                                    :nav-history  []}}
+                                   :hidden-libs layout/default-hidden-libs
+                                   :max-visible nil})
+        state       @cursor
+        view        (active-view state)
+        {:keys [selected left-offset right-offset]} view
+        {:keys [hidden-libs max-visible]} state
+        tab-roots   (tab-root-set state)
         ;; Defer layout computation until the client has reported viewport
         ;; dimensions (max-visible). The dep-viewer container must always
         ;; render so data-track-height can measure it and fire the change
@@ -268,8 +412,8 @@
                                              hidden-libs max-visible))]
     ;; Full-viewport flex column: toolbar on top, content fills the rest
     [:div {:class "h-screen flex flex-col bg-slate-100"}
-     ;; Toolbar (shrink-0 keeps it at natural size)
-     (render-toolbar cursor selected db)
+     ;; Toolbar with nav buttons, tabs, and search
+     (render-toolbar cursor db)
 
      ;; Content area fills remaining space, centers the graph.
      ;; data-draw-arrows passes connection JSON to the client-side arrow plugin.
@@ -296,21 +440,25 @@
                 :data-ignore-morph true}]
 
          ;; Left column: dependants
-         (render-column (:left layout-data) :left selected cursor db)
+         (render-column (:left layout-data) :left selected cursor db tab-roots)
 
          ;; Center: selected artifact
          [:div {:class "relative flex flex-col justify-center w-[280px] h-full"}
           (render-box (:selected-box layout-data) true
-                      (h/action))]
+                      (h/action)
+                      (when-not (tab-roots selected)
+                        (h/action (open-tab! cursor db selected))))]
 
          ;; Right column: dependencies
-         (render-column (:right layout-data) :right selected cursor db)))]
+         (render-column (:right layout-data) :right selected cursor db tab-roots)))]
 
      ;; Footer with summary statistics
      (render-footer db)
 
-     ;; Hidden modal — activated by client-side JS when the server disconnects
-     [:div {:id "modal-container"}
+     ;; Disconnect modal — invisible by default, revealed by client-side JS.
+     ;; data-ignore-morph prevents Datastar's DOM morph from reverting the
+     ;; visibility change after a server re-render.
+     [:div {:id "modal-container" :data-ignore-morph true}
       [:div {:id "disconnect-modal" :class "modal"}
        [:div {:class "modal-box text-center"}
         [:p {:class "text-lg"} "You may close this window now."]]

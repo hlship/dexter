@@ -11,8 +11,9 @@ Mousing over a dependency arrow expands it and, for non-exact matches, displays 
 ## Features
 
 - **Three-column explorer** — select an artifact to see its dependants (left), the artifact itself (center), and its dependencies (right)
+- **Multiple tabs** — open independent views into different parts of the dependency tree; each tab has its own navigation history
 - **Version mismatch detection** — arrows and box borders are color-coded by compatibility: black (exact match), green (compatible), red (incompatible), yellow (unknown/git SHA)
-- **Keyboard navigation** — `⌘F`/`Ctrl+F` to search artifacts by name, `⌘H`/`Ctrl+H` to return to the project root
+- **Keyboard navigation** — `⌘F`/`Ctrl+F` to search artifacts by name, `⌘H`/`Ctrl+H` to return to the tab's root, `⌘B`/`Ctrl+B` to navigate back
 - **Animated transitions** — boxes animate smoothly when navigating; arrows fade out and redraw
 - **Dynamic layout** — columns resize automatically to fill the viewport
 - **Windowed columns** — large dependency lists are windowed with scroll indicators so the display stays readable
@@ -82,6 +83,19 @@ dexter -p 8080 -O
 
 Click any artifact to make it the new selection. The display animates to show its dependants and dependencies.
 
+### Tabs
+
+Dexter supports multiple tabs, each providing an independent view into the dependency tree.
+
+<!-- TODO: add screenshot showing multiple tabs -->
+![Tabs](docs/images/tabs.png)
+
+- The **ROOT tab** is always present and cannot be closed; it shows the full project dependency tree
+- Hover over any artifact box to reveal a **⊕ button** — click it to open a new tab rooted at that artifact
+- Each tab maintains its own **navigation history** — the Home and Back buttons apply to the current tab
+- Tabs that are no longer needed can be closed with the **× button**; closing a tab switches to the most recently viewed tab
+- When many tabs are open, they scroll horizontally (the ROOT tab stays pinned)
+
 ### Arrow Colors
 
 Arrows represent dependency relationships. Their color indicates whether the version requested by the parent matches the version actually resolved:
@@ -97,8 +111,12 @@ Hover over any arrow to highlight it and see the requested version.
 
 ### Box Annotations
 
+<!-- TODO: add screenshot showing box annotations and open-tab button -->
+![Box Annotations](docs/images/box-annotations.png)
+
 - **Wide colored right border** — the artifact has a dependency with a version mismatch (color reflects the worst mismatch)
 - **Wide grey right border** — the artifact is a leaf node (no further dependencies)
+- **⊕ button** (upper-right, on hover) — opens a new tab rooted at this artifact
 
 ## Development
 

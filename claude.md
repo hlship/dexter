@@ -41,11 +41,18 @@ Special key `'ROOT` represents the project itself.
  :by-label   {lowercase-label -> key}}             ; search index
 ```
 
-**View cursor** (Hyper tab-cursor `:view`):
+**View cursor** (Hyper tab-cursor `:view`) — supports multiple UI tabs, each with independent navigation:
 ```clojure
-{:selected artifact-key, :left-offset int, :right-offset int,
- :nav-history [{:selected key :left-offset n :right-offset n} ...],  ; stack (vector, peek/pop)
- :hidden-libs #{...}, :max-visible int?}
+{:tabs        [{:id 0 :root 'ROOT :label "Project Root"} ...]  ; tab definitions
+ :active-tab  0                                                  ; id of selected tab
+ :next-id     1                                                  ; counter for new tab ids
+ :tab-history [0 ...]                                            ; tab ids ordered by recency (most recent last)
+ :views       {0 {:selected 'ROOT                               ; per-tab view state
+                   :left-offset 0
+                   :right-offset 0
+                   :nav-history [{:selected key :left-offset n :right-offset n} ...]}}
+ :hidden-libs #{...}                                             ; shared across all tabs
+ :max-visible int?}                                              ; shared (viewport-level)
 ```
 
 **Layout** (output of `layout/compute-layout`):
@@ -59,7 +66,8 @@ Special key `'ROOT` represents the project itself.
 ## Conventions
 
 - **Data flow:** The db value is passed to `service/start!` as `:db`, seeded into Hyper's app-state atom, and extracted in views via `(:db @(:hyper/app-state req))`. Views receive db as a parameter — they never access a global atom.
-- **Navigation:** All artifact selection changes (box clicks, search, home) go through `navigate!` which pushes current state onto `:nav-history` before switching. `navigate-back!` pops the stack and restores `{:selected :left-offset :right-offset}`.
+- **Tabs:** Multiple UI tabs allow independent views into the dependency tree. The ROOT tab (id 0) can't be closed. `open-tab!` creates a new tab rooted at an artifact; `close-tab!` removes one and selects the most recently viewed; `select-tab!` switches between tabs. Artifact boxes show a ⊕ icon to open a new tab unless the artifact already has one. `tab-root-set` returns the set of artifact keys that have tabs.
+- **Navigation:** All artifact selection changes (box clicks, search, home) go through `navigate!` which pushes current state onto the active tab's `:nav-history` before switching. `navigate-back!` pops the stack and restores `{:selected :left-offset :right-offset}`. The home button navigates to the root artifact of the current tab (via `active-tab-root`), not necessarily `'ROOT`.
 - **Column scrolling:** Mouse wheel scrolling on columns uses Datastar's built-in `data-on:wheel` with `$scroll-delta-y` (a custom Hyper client param) and `scroll-offset` for bounds-clamped offset updates.
 - **Rendering:** Hiccup vectors with Tailwind utility classes. Use `h/action` for server-side actions triggered by Datastar `data-on:*` attributes.
 - **Client params:** `$value`, `$key`, `$form-data`, `$scroll-delta-y` etc. are Hyper macros that extract DOM values client-side and send them to the server action. They appear as unresolvable symbols in the editor — this is expected. Custom params (like `$scroll-delta-y`) are added via `alter-var-root` on `h/client-param-registry` at the top of `views.clj`.
@@ -67,7 +75,7 @@ Special key `'ROOT` represents the project itself.
 - **SVG arrows:** Drawn client-side via `data-draw-arrows` plugin. Connection data (including version-match colors) is serialized to JSON by the server.
 - **FLIP animation:** Box transitions use the Web Animations API. The `data-draw-arrows` plugin's `apply()` callback serves as the morph signal — no MutationObserver needed.
 - **Version compatibility:** Classified by `layout/version-match` using `version-clj`: exact (black), compatible (green), incompatible (red), unknown/git-sha (yellow).
-- **Server disconnect modal:** A DaisyUI modal (`#disconnect-modal` inside `#modal-container`) is rendered hidden in the page by `home-page`. Client-side JS listens for Datastar's `datastar-fetch` custom events; on `"retrying"` or `"retries-failed"` it adds the `modal-open` class to show the modal with "You may close this window now." The `data-accel` plugin checks `#modal-container > *` to suppress keyboard shortcuts when any modal is visible.
+- **Server disconnect modal:** A DaisyUI modal (`#disconnect-modal` inside `#modal-container`) is rendered hidden in the page by `home-page`. The container has `data-ignore-morph` so Datastar's DOM morph won't revert JS changes. Client-side JS listens for `datastar-fetch` custom events; on `"retrying"` or `"retries-failed"` it adds `modal-open` to show "You may close this window now." The `data-accel` plugin checks `#modal-container > *` to suppress keyboard shortcuts when any modal is visible.
 
 ## Running
 
