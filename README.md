@@ -94,7 +94,7 @@ Dexter supports multiple tabs, each providing an independent view into the depen
 - Hover over any artifact box to reveal a **⊕ button** — click it to open a new tab rooted at that artifact
 - Each tab maintains its own **navigation history** — the Home and Back buttons apply to the current tab
 - Tabs that are no longer needed can be closed with the **× button**; closing a tab switches to the most recently viewed tab
-- When many tabs are open, they scroll horizontally (the ROOT tab stays pinned)
+- When many tabs are open, they scroll horizontally (but the root tab stays pinned to the left side)
 
 ### Arrow Colors
 
@@ -116,7 +116,6 @@ Hover over any arrow to highlight it and see the requested version.
 
 - **Wide colored right border** — the artifact has a dependency with a version mismatch (color reflects the worst mismatch)
 - **Wide grey right border** — the artifact is a leaf node (no further dependencies)
-- **⊕ button** (upper-right, on hover) — opens a new tab rooted at this artifact
 
 ## Development
 
