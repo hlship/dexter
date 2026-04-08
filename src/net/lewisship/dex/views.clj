@@ -258,43 +258,53 @@
                                     :hidden-libs layout/default-hidden-libs
                                     :max-visible nil})
         {:keys [selected left-offset right-offset hidden-libs max-visible]} @cursor
-        layout-data (layout/compute-layout db selected left-offset right-offset hidden-libs max-visible)]
+        ;; Defer layout computation until the client has reported viewport
+        ;; dimensions (max-visible). The dep-viewer container must always
+        ;; render so data-track-height can measure it and fire the change
+        ;; event that seeds max-visible. The JS fallback constants are
+        ;; conservative so the first visible render is correct.
+        layout-data (when max-visible
+                      (layout/compute-layout db selected left-offset right-offset
+                                             hidden-libs max-visible))]
     ;; Full-viewport flex column: toolbar on top, content fills the rest
     [:div {:class "h-screen flex flex-col bg-slate-100"}
      ;; Toolbar (shrink-0 keeps it at natural size)
      (render-toolbar cursor selected db)
 
-     ;; Content area fills remaining space, centers the graph
-     ;; data-draw-arrows passes connection JSON to the client-side arrow plugin
-     [:div {:id "dep-viewer"
-            :class "flex-1 min-h-0 relative flex justify-center gap-[120px] overflow-auto"
-            :data-draw-arrows (connections->json (:connections layout-data)
-                                                 (:id (:selected-box layout-data)))
-            :data-track-height "true"
-            :data-on:change__debounce.300ms
-            (h/action
-             (when-let [mv (some-> $value not-empty parse-long)]
-               (when (and (pos? mv) (not= mv (:max-visible @cursor)))
-                 (swap! cursor assoc :max-visible mv))))}
+     ;; Content area fills remaining space, centers the graph.
+     ;; data-draw-arrows passes connection JSON to the client-side arrow plugin.
+     [:div (cond-> {:id "dep-viewer"
+                    :class "flex-1 min-h-0 relative flex justify-center gap-[120px] overflow-auto"
+                    :data-track-height "true"
+                    :data-on:change__debounce.300ms
+                    (h/action
+                     (when-let [mv (some-> $value not-empty parse-long)]
+                       (when (and (pos? mv) (not= mv (:max-visible @cursor)))
+                         (swap! cursor assoc :max-visible mv))))}
+             layout-data
+             (assoc :data-draw-arrows (connections->json (:connections layout-data)
+                                                         (:id (:selected-box layout-data)))))
 
-      ;; Empty SVG container — client-side JS populates arrow paths
-      [:svg {:id "arrow-overlay"
-             :class "absolute inset-0 pointer-events-none"
-             :width "100%"
-             :height "100%"
-             :xmlns "http://www.w3.org/2000/svg"
-             :data-ignore-morph true}]
+      (when layout-data
+        (list
+         ;; Empty SVG container — client-side JS populates arrow paths
+         [:svg {:id "arrow-overlay"
+                :class "absolute inset-0 pointer-events-none"
+                :width "100%"
+                :height "100%"
+                :xmlns "http://www.w3.org/2000/svg"
+                :data-ignore-morph true}]
 
-      ;; Left column: dependants
-      (render-column (:left layout-data) :left selected cursor db)
+         ;; Left column: dependants
+         (render-column (:left layout-data) :left selected cursor db)
 
-      ;; Center: selected artifact
-      [:div {:class "relative flex flex-col justify-center w-[280px] h-full"}
-       (render-box (:selected-box layout-data) true
-                   (h/action))]
+         ;; Center: selected artifact
+         [:div {:class "relative flex flex-col justify-center w-[280px] h-full"}
+          (render-box (:selected-box layout-data) true
+                      (h/action))]
 
-      ;; Right column: dependencies
-      (render-column (:right layout-data) :right selected cursor db)]
+         ;; Right column: dependencies
+         (render-column (:right layout-data) :right selected cursor db)))]
 
      ;; Footer with summary statistics
      (render-footer db)

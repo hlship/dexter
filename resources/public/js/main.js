@@ -459,7 +459,7 @@ attribute({
  * Fallback constants are used only before any columns have been rendered.
  */
 const FALLBACK_BOX_SLOT_HEIGHT = 68; // box + gap fallback
-const FALLBACK_COLUMN_PADDING = 40;  // vertical padding/margin fallback
+const FALLBACK_COLUMN_PADDING = 80;  // overhead for two overflow indicators (~24px each + 12px gap)
 
 /**
  * Measures column layout metrics from a rendered .dep-column element.
