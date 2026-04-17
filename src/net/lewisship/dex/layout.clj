@@ -201,6 +201,42 @@
                 (cons 'ROOT all-keys))]
     (assoc counts :artifact-count (count all-keys))))
 
+(defn artifacts-by-match
+  "Returns artifacts grouped by version-match category.
+
+  Iterates all dependency relationships and classifies each by version-match.
+  Collects the *dependency target* artifact for each non-exact match into
+  category sets. An artifact may appear in multiple categories.
+
+  Returns a map of:
+  - :compatible    - sorted vec of {:key artifact-key :label string}
+  - :incompatible  - sorted vec of {:key artifact-key :label string}
+  - :unknown       - sorted vec of {:key artifact-key :label string}"
+  [db]
+  (let [;; Accumulate sets of artifact keys per category
+        by-cat (reduce
+                (fn [acc artifact-key]
+                  (reduce
+                   (fn [acc {:keys [to requested-version resolved-version]}]
+                     (let [m (version-match requested-version resolved-version)]
+                       (if (= :exact m)
+                         acc
+                         (update acc m (fnil conj #{}) to))))
+                   acc
+                   (deps/dependencies db artifact-key)))
+                {}
+                (deps/artifact-keys db))
+        ;; Convert key sets to sorted label+key vectors
+        to-entries (fn [ks]
+                     (->> (or ks #{})
+                          (mapv (fn [k]
+                                  {:key k
+                                   :label (:label (deps/artifact-info db k))}))
+                          (sort-by :label)))]
+    {:compatible   (to-entries (:compatible by-cat))
+     :incompatible (to-entries (:incompatible by-cat))
+     :unknown      (to-entries (:unknown by-cat))}))
+
 (defn compute-layout
   "Computes the full layout for the dependency viewer.
 

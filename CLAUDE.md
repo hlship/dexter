@@ -10,7 +10,7 @@ Interactive browser-based tool for exploring JVM dependency graphs. Resolves dep
 
 **Server (Clojure):** Hyper framework (`dynamic-alpha/hyper`) provides server-side rendering with live updates via SSE. Datastar on the client handles DOM morphing and reactivity via `data-*` attributes.
 
-**Client (JS):** A single ES module (`resources/public/js/main.js`) with three Datastar `attribute` plugins: `data-draw-arrows` (SVG arrows + FLIP animation), `data-track-height` (viewport sizing), and `data-accel` (keyboard shortcuts). Also includes a `datastar-fetch` event listener for server disconnect detection (see below).
+**Client (JS):** A single ES module (`resources/public/js/main.js`) with four Datastar `attribute` plugins: `data-draw-arrows` (SVG arrows + FLIP animation), `data-track-height` (viewport sizing), `data-arrow-nav` (arrow-key navigation for focusable lists), and `data-accel` (keyboard shortcuts). Also includes a `datastar-fetch` event listener for server disconnect detection (see below).
 
 **CSS:** Tailwind CSS v4 — source at `public/style.css`, built via `bb tailwind` into `generated-resources/public/style.css`.
 
@@ -52,7 +52,8 @@ Special key `'ROOT` represents the project itself.
                    :right-offset 0
                    :nav-history [{:selected key :left-offset n :right-offset n} ...]}}
  :hidden-libs #{...}                                             ; shared across all tabs
- :max-visible int?}                                              ; shared (viewport-level)
+ :max-visible int?                                               ; shared (viewport-level)
+ :footer-popup nil}                                              ; :compatible, :incompatible, :unknown, or nil
 ```
 
 **Layout** (output of `layout/compute-layout`):
@@ -75,7 +76,9 @@ Special key `'ROOT` represents the project itself.
 - **SVG arrows:** Drawn client-side via `data-draw-arrows` plugin. Connection data (including version-match colors) is serialized to JSON by the server.
 - **FLIP animation:** Box transitions use the Web Animations API. The `data-draw-arrows` plugin's `apply()` callback serves as the morph signal — no MutationObserver needed.
 - **Version compatibility:** Classified by `layout/version-match` using `version-clj`: exact (black), compatible (green), incompatible (red), unknown/git-sha (yellow).
-- **Server disconnect modal:** A DaisyUI modal (`#disconnect-modal` inside `#modal-container`) is rendered hidden in the page by `home-page`. The container has `data-ignore-morph` so Datastar's DOM morph won't revert JS changes. Client-side JS listens for `datastar-fetch` custom events; on `"retrying"` or `"retries-failed"` it adds `modal-open` to show "You may close this window now." The `data-accel` plugin checks `#modal-container .modal-open` to suppress keyboard shortcuts when any modal is visible.
+- **Footer category popups:** The footer's colored indicators (compatible/incompatible/unknown) are clickable. Clicking one sets `:footer-popup` in the view cursor, which triggers a server-rendered DaisyUI modal listing all artifacts in that category (via `layout/artifacts-by-match`). The popup includes a search/filter field (when >8 items), scrollable list, and closes on backdrop click, ✕ button, or Escape key. Clicking an artifact navigates to it and closes the popup.
+- **Server disconnect modal:** A DaisyUI modal (`#disconnect-modal` inside `#modal-container`) is rendered hidden in the page by `home-page`. The container has `data-ignore-morph` so Datastar's DOM morph won't revert JS changes. Client-side JS listens for `datastar-fetch` custom events; on `"retrying"` or `"retries-failed"` it adds `modal-open` to show "You may close this window now."
+- **Modal suppression:** The `data-accel` plugin checks `.modal.modal-open` to suppress keyboard shortcuts when any modal is visible (both server-rendered popups and client-side modals).
 
 ## Running
 
@@ -101,6 +104,11 @@ bb test
 - **⌘F** / **Ctrl+F** — Focus artifact search field
 - **⌘H** / **Ctrl+H** — Navigate to root node
 - **⌘B** / **Ctrl+B** — Navigate back (undo last navigation)
+- **⌘1** / **Ctrl+1** — Open compatible dependencies popup
+- **⌘2** / **Ctrl+2** — Open incompatible dependencies popup
+- **⌘3** / **Ctrl+3** — Open unknown dependencies popup
+- **Escape** — Close open popup
+- **Enter** (in popup filter) — Navigate to first matching artifact
 
 ## Future Work
 

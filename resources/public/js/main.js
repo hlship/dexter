@@ -549,6 +549,66 @@ attribute({
 });
 
 /**
+ * Datastar plugin: data-arrow-nav
+ *
+ * Adds arrow-key navigation to a container's focusable children
+ * (elements with tabindex). ArrowDown/ArrowUp move focus between
+ * siblings; Home/End jump to first/last. Focus wraps around at
+ * the edges.
+ *
+ * When the focused element is an input/textarea, arrow keys are
+ * not intercepted (to allow normal cursor movement in the field).
+ * ArrowDown from an input moves focus to the first list item.
+ *
+ * Usage in Hiccup:
+ *   [:ul {:data-arrow-nav "true"} ...]
+ */
+attribute({
+  name: 'arrow-nav',
+  requirement: { key: 'denied', value: 'must' },
+  apply: ({ el }) => {
+    const handler = (e) => {
+      const isInput = e.target.matches('input, textarea');
+      const items = [...el.querySelectorAll('[tabindex]')];
+      if (!items.length) return;
+
+      let idx = items.indexOf(document.activeElement);
+
+      // Find the search input (if any) for ArrowUp-back-to-search
+      const input = el.querySelector('input[type="text"]');
+
+      const focusItem = (item) => {
+        item.focus();
+        item.scrollIntoView({ block: 'nearest' });
+      };
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        // From input or before list → first item; otherwise next (wrapping)
+        if (isInput || idx < 0) { focusItem(items[0]); }
+        else { focusItem(items[(idx + 1) % items.length]); }
+      } else if (e.key === 'ArrowUp') {
+        if (isInput) return; // allow normal cursor movement in the field
+        e.preventDefault();
+        // At first item with a search field → return focus to it
+        if (idx === 0 && input) { input.focus(); }
+        else if (idx <= 0) { focusItem(items[items.length - 1]); }
+        else { focusItem(items[idx - 1]); }
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        focusItem(items[0]);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        focusItem(items[items.length - 1]);
+      }
+    };
+
+    el.addEventListener('keydown', handler);
+    return () => el.removeEventListener('keydown', handler);
+  },
+});
+
+/**
  * Datastar plugin: data-accel
  *
  * Declares a keyboard accelerator (Cmd on Mac, Ctrl on Windows/Linux) that
@@ -585,7 +645,7 @@ attribute({
       if (e.key !== accelKey) return;
       if (!!e.shiftKey !== needsShift) return;
       if (el.hasAttribute('disabled')) return;
-      if (document.querySelector('#modal-container .modal-open')) return;
+      if (document.querySelector('.modal.modal-open')) return;
       e.preventDefault();
        
       if (el.type === "text") 
@@ -608,8 +668,8 @@ attribute({
 //
 // The modal markup lives in the Hiccup template (views.clj) inside
 // #modal-container. The data-accel plugin already checks for
-// '#modal-container .modal-open' to suppress keyboard shortcuts when a
-// modal is visible.
+// '.modal.modal-open' to suppress keyboard shortcuts when any modal is
+// visible (both server-rendered popups and client-side modals).
 
 document.addEventListener("datastar-fetch", (e) => {
   const { type } = e.detail;

@@ -4,6 +4,7 @@
   Produces the page layout, artifact boxes, columns, toolbar, and
   connection data for the client-side arrow overlay."
   (:require [cheshire.core :as json]
+            [clojure.string :as string]
             [hyper.core :as h]
             [net.lewisship.dex.deps :as deps]
             [net.lewisship.dex.layout :as layout]))
@@ -253,30 +254,148 @@
 
 ;; --- Footer ---
 
+(def ^:private category-config
+  "Display configuration for each version-match category."
+  {:compatible   {:label       "compatible"
+                  :title       "Compatible Dependencies"
+                  :text-class  "text-green-600"
+                  :badge-class "badge-success"}
+   :incompatible {:label       "incompatible"
+                  :title       "Incompatible Dependencies"
+                  :text-class  "text-red-600 font-semibold"
+                  :badge-class "badge-error"}
+   :unknown      {:label       "unknown"
+                  :title       "Unknown Compatibility"
+                  :text-class  "text-yellow-600"
+                  :badge-class "badge-warning"}})
+
+(defn- render-footer-popup
+  "Renders a modal popup listing artifacts for a version-match category.
+  Includes a search field to filter the list and clickable artifact names
+  that navigate to the artifact and close the popup."
+  [cursor db category]
+  (let [{:keys [title badge-class]} (category-config category)
+        search        (h/tab-cursor :footer-search "")
+        search-text   (string/lower-case (str @search))
+        all-artifacts (get (layout/artifacts-by-match db) category)
+        artifacts     (if (seq search-text)
+                        (filterv #(string/includes?
+                                   (string/lower-case (:label %))
+                                   search-text)
+                                 all-artifacts)
+                        all-artifacts)
+        close-action  (h/action
+                        (swap! cursor assoc :footer-popup nil)
+                        (reset! search ""))]
+    [:div {:class "modal modal-open"
+           :data-on:keydown__window
+           (str "if (evt.key !== 'Escape') return; evt.preventDefault(); "
+                close-action)}
+     [:div {:class "modal-box max-w-md flex flex-col max-h-[80vh]"
+            :data-arrow-nav "true"}
+      ;; Header with title, count badge, and close button
+      [:div {:class "flex items-center justify-between mb-3"}
+       [:h3 {:class "font-bold text-lg flex items-center gap-2"}
+        title
+        [:span {:class (str "badge badge-sm " badge-class)}
+         (count all-artifacts)]]
+       [:button {:class "btn btn-sm btn-circle btn-ghost"
+                 :data-on:click close-action}
+        "✕"]]
+      ;; Search field (shown when enough items to warrant filtering)
+      (when (> (count all-artifacts) 8)
+        [:input {:class "input input-bordered input-sm w-full mb-3"
+                 :type        "text"
+                 :placeholder "Filter..."
+                 :value       @search
+                 :data-init   "el.focus()"
+                 :data-on:input
+                 (str (h/action (reset! search $value)))
+                 ;; Enter navigates to the first visible match
+                 :data-on:keydown
+                 (when-let [first-key (:key (first artifacts))]
+                   (str "if (evt.key !== 'Enter') return; evt.preventDefault(); "
+                        (h/action
+                          (navigate! cursor first-key)
+                          (swap! cursor assoc :footer-popup nil)
+                          (reset! search ""))
+                        "; el.value = ''; el.blur()"))}])
+      ;; Scrollable, keyboard-navigable artifact list.
+      ;; Each item is focusable (tabindex) so Tab cycles through matches.
+      ;; Enter or click on a focused item navigates to it.
+      (let [has-search? (> (count all-artifacts) 8)]
+        [:ul {:class "overflow-y-auto flex-1 min-h-0"}
+         (if (seq artifacts)
+           (map-indexed
+            (fn [idx {:keys [key label]}]
+              (let [select-action (h/action
+                                    (navigate! cursor key)
+                                    (swap! cursor assoc :footer-popup nil)
+                                    (reset! search ""))]
+                [:li {:class    "py-1.5 px-2 rounded cursor-pointer text-sm truncate
+                                 transition-colors outline-none
+                                 hover:bg-base-200 focus:bg-base-200 focus:ring-1 focus:ring-blue-400"
+                      :tabindex "0"
+                      :title    label
+                      ;; Auto-focus first item when there's no search field
+                      :data-init (when (and (zero? idx) (not has-search?))
+                                   "el.focus()")
+                      :data-on:click   (str select-action)
+                      :data-on:keydown (str "if (evt.key !== 'Enter') return; evt.preventDefault(); "
+                                            select-action)}
+                 label]))
+            artifacts)
+           [:li {:class "py-4 text-center text-sm text-slate-400"}
+            "No matches"])])]
+     ;; Backdrop closes the popup
+     [:div {:class "modal-backdrop"
+            :data-on:click close-action}]]))
+
+(def ^:private category-accel
+  "Keyboard accelerator keys for each category."
+  {:compatible "1" :incompatible "2" :unknown "3"})
+
+(defn- render-footer-indicator
+  "Renders a single clickable footer indicator for a version-match category.
+  Also registers a keyboard accelerator (Cmd/Ctrl+1/2/3) via data-accel."
+  [cursor category count]
+  (let [{:keys [label text-class]} (category-config category)
+        accel (category-accel category)]
+    [:button {:class (str "tooltip tooltip-top " text-class
+                          " hover:underline cursor-pointer bg-transparent border-none p-0")
+              :data-accel         accel
+              :data-preserve-attr "data-tip"
+              :data-on:click (h/action (swap! cursor assoc :footer-popup category))}
+     (str count " " label)]))
+
 (defn- render-footer
-  "Renders a footer bar with summary statistics about the dependency graph."
-  [db]
+  "Renders a footer bar with summary statistics about the dependency graph.
+  The colored indicators are clickable and open a popup listing the matching
+  artifacts."
+  [cursor db]
   (let [{:keys [artifact-count dep-count compatible incompatible unknown]}
         (layout/summary-stats db)
-        summary (str artifact-count " artifacts; " dep-count " dependencies")
+        summary   (str artifact-count " artifacts; " dep-count " dependencies")
+        popup-cat (:footer-popup @cursor)
         parts (cond-> []
                 (pos? (or compatible 0))
-                (conj [:span {:class "text-green-600"}
-                       (str compatible " compatible")])
+                (conj (render-footer-indicator cursor :compatible compatible))
                 (pos? (or incompatible 0))
-                (conj [:span {:class "text-red-600 font-semibold"}
-                       (str incompatible " incompatible")])
+                (conj (render-footer-indicator cursor :incompatible incompatible))
                 (pos? (or unknown 0))
-                (conj [:span {:class "text-yellow-600"}
-                       (str unknown " unknown")]))]
-    [:div {:class "bg-white border-t border-slate-200 px-4 py-1.5 text-xs text-slate-500 shrink-0"}
-     (if (seq parts)
-       (str summary " — ")
-       summary)
-     (for [[i part] (map-indexed vector parts)]
-       (if (zero? i)
-         part
-         [:span " · " part]))]))
+                (conj (render-footer-indicator cursor :unknown unknown)))]
+    (list
+     [:div {:class "bg-white border-t border-slate-200 px-4 py-1.5 text-xs text-slate-500 shrink-0"}
+      (if (seq parts)
+        (str summary " — ")
+        summary)
+      (for [[i part] (map-indexed vector parts)]
+        (if (zero? i)
+          part
+          [:span " · " part]))]
+     ;; Render popup when a category is selected
+     (when popup-cat
+       (render-footer-popup cursor db popup-cat)))))
 
 ;; --- Page Rendering ---
 
@@ -396,7 +515,8 @@
                                                     :right-offset 0
                                                     :nav-history  []}}
                                    :hidden-libs layout/default-hidden-libs
-                                   :max-visible nil})
+                                   :max-visible nil
+                                   :footer-popup nil})
         state       @cursor
         view        (active-view state)
         {:keys [selected left-offset right-offset]} view
@@ -452,8 +572,8 @@
          ;; Right column: dependencies
          (render-column (:right layout-data) :right selected cursor db tab-roots)))]
 
-     ;; Footer with summary statistics
-     (render-footer db)
+     ;; Footer with summary statistics and optional category popup
+     (render-footer cursor db)
 
      ;; Disconnect modal — invisible by default, revealed by client-side JS.
      ;; data-ignore-morph prevents Datastar's DOM morph from reverting the
