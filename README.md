@@ -13,7 +13,7 @@ Mousing over a dependency arrow expands it and, for non-exact matches, displays 
 - **Three-column explorer** — select an artifact to see its dependants (left), the artifact itself (center), and its dependencies (right)
 - **Multiple tabs** — open independent views into different parts of the dependency tree; each tab has its own navigation history
 - **Version mismatch detection** — arrows and box borders are color-coded by compatibility: black (exact match), green (compatible), red (incompatible), yellow (unknown/git SHA)
-- **Keyboard navigation** — `⌘F`/`Ctrl+F` to search artifacts by name, `⌘H`/`Ctrl+H` to return to the tab's root, `⌘B`/`Ctrl+B` to navigate back
+- **Keyboard navigation** — `⌘F`/`Ctrl+F` to search, `⌘H`/`Ctrl+H` home, `⌘B`/`Ctrl+B` back, `⌘1`/`⌘2`/`⌘3` to browse compatible/incompatible/unknown dependencies
 - **Animated transitions** — boxes animate smoothly when navigating; arrows fade out and redraw
 - **Dynamic layout** — columns resize automatically to fill the viewport
 - **Windowed columns** — large dependency lists are windowed with scroll indicators so the display stays readable
@@ -116,6 +116,16 @@ Hover over any arrow to highlight it and see the requested version.
 
 - **Wide colored right border** — the artifact has a dependency with a version mismatch (color reflects the worst mismatch)
 - **Wide grey right border** — the artifact is a leaf node (no further dependencies)
+
+### Dependency Status Popups
+
+The footer bar displays summary counts of compatible, incompatible, and unknown dependency relationships. Click any count (or use `⌘1`/`⌘2`/`⌘3`) to open a popup listing all artifacts in that category.
+
+- **Filter** — type to narrow the list (appears when there are more than eight items)
+- **Navigate** — click an artifact or press `Enter` to navigate to it
+- **Keyboard** — `↑`/`↓` arrow keys and `Tab` cycle through the list; `Home`/`End` jump to the first/last item; `Escape` closes the popup
+
+An artifact may appear in more than one category if different dependants request it with different version compatibility outcomes.
 
 ## Development
 
