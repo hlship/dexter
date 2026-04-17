@@ -75,7 +75,7 @@ Special key `'ROOT` represents the project itself.
 - **SVG arrows:** Drawn client-side via `data-draw-arrows` plugin. Connection data (including version-match colors) is serialized to JSON by the server.
 - **FLIP animation:** Box transitions use the Web Animations API. The `data-draw-arrows` plugin's `apply()` callback serves as the morph signal — no MutationObserver needed.
 - **Version compatibility:** Classified by `layout/version-match` using `version-clj`: exact (black), compatible (green), incompatible (red), unknown/git-sha (yellow).
-- **Server disconnect modal:** A DaisyUI modal (`#disconnect-modal` inside `#modal-container`) is rendered hidden in the page by `home-page`. The container has `data-ignore-morph` so Datastar's DOM morph won't revert JS changes. Client-side JS listens for `datastar-fetch` custom events; on `"retrying"` or `"retries-failed"` it adds `modal-open` to show "You may close this window now." The `data-accel` plugin checks `#modal-container > *` to suppress keyboard shortcuts when any modal is visible.
+- **Server disconnect modal:** A DaisyUI modal (`#disconnect-modal` inside `#modal-container`) is rendered hidden in the page by `home-page`. The container has `data-ignore-morph` so Datastar's DOM morph won't revert JS changes. Client-side JS listens for `datastar-fetch` custom events; on `"retrying"` or `"retries-failed"` it adds `modal-open` to show "You may close this window now." The `data-accel` plugin checks `#modal-container .modal-open` to suppress keyboard shortcuts when any modal is visible.
 
 ## Running
 

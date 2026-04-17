@@ -585,7 +585,7 @@ attribute({
       if (e.key !== accelKey) return;
       if (!!e.shiftKey !== needsShift) return;
       if (el.hasAttribute('disabled')) return;
-      if (document.querySelector('#modal-container > *')) return;
+      if (document.querySelector('#modal-container .modal-open')) return;
       e.preventDefault();
        
       if (el.type === "text") 
@@ -608,8 +608,8 @@ attribute({
 //
 // The modal markup lives in the Hiccup template (views.clj) inside
 // #modal-container. The data-accel plugin already checks for
-// '#modal-container > *' to suppress keyboard shortcuts when a modal
-// is visible.
+// '#modal-container .modal-open' to suppress keyboard shortcuts when a
+// modal is visible.
 
 document.addEventListener("datastar-fetch", (e) => {
   const { type } = e.detail;
