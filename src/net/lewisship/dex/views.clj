@@ -5,6 +5,7 @@
   connection data for the client-side arrow overlay."
   (:require [cheshire.core :as json]
             [clojure.string :as string]
+            [hyper.client-params :as cp]
             [hyper.core :as h]
             [net.lewisship.dex.deps :as deps]
             [net.lewisship.dex.layout :as layout]))
@@ -12,8 +13,8 @@
 ;; Extend Hyper's client-param registry so that $scroll-delta-y can be used
 ;; inside h/action forms to receive the wheel event's deltaY on the server.
 ;; This must execute before any h/action macro that references the symbol.
-(alter-var-root #'h/client-param-registry
-                assoc '$scroll-delta-y {:js "evt.deltaY" :key "scrollDeltaY"})
+(defmethod cp/client-param '$scroll-delta-y [_]
+  {:js "evt.deltaY" :key "scrollDeltaY"})
 
 ;; --- Tab & View State Helpers ---
 
@@ -289,8 +290,10 @@
                         (reset! search ""))]
     [:div {:class "modal modal-open"
            :data-on:keydown__window
-           (str "if (evt.key !== 'Escape') return; evt.preventDefault(); "
-                close-action)}
+           (str "if (evt.key === 'Escape') { evt.preventDefault(); "
+                (h/action (swap! cursor assoc :footer-popup nil)
+                          (reset! search ""))
+                " }")}
      [:div {:class "modal-box max-w-md flex flex-col max-h-[80vh]"
             :data-arrow-nav "true"}
       ;; Header with title, count badge, and close button
@@ -314,12 +317,11 @@
                  ;; Enter navigates to the first visible match
                  :data-on:keydown
                  (when-let [first-key (:key (first artifacts))]
-                   (str "if (evt.key !== 'Enter') return; evt.preventDefault(); "
-                        (h/action
-                          (navigate! cursor first-key)
-                          (swap! cursor assoc :footer-popup nil)
-                          (reset! search ""))
-                        "; el.value = ''; el.blur()"))}])
+                   (str "if (evt.key === 'Enter') { evt.preventDefault(); "
+                        (h/action (navigate! cursor first-key)
+                                  (swap! cursor assoc :footer-popup nil)
+                                  (reset! search ""))
+                        "; el.value = ''; el.blur() }"))}])
       ;; Scrollable, keyboard-navigable artifact list.
       ;; Each item is focusable (tabindex) so Tab cycles through matches.
       ;; Enter or click on a focused item navigates to it.
@@ -341,8 +343,12 @@
                       :data-init (when (and (zero? idx) (not has-search?))
                                    "el.focus()")
                       :data-on:click   (str select-action)
-                      :data-on:keydown (str "if (evt.key !== 'Enter') return; evt.preventDefault(); "
-                                            select-action)}
+                      :data-on:keydown
+                      (str "if (evt.key === 'Enter') { evt.preventDefault(); "
+                           (h/action (navigate! cursor key)
+                                     (swap! cursor assoc :footer-popup nil)
+                                     (reset! search ""))
+                           " }")}
                  label]))
             artifacts)
            [:li {:class "py-4 text-center text-sm text-slate-400"}
@@ -490,12 +496,11 @@
                                       "; el.value = ''; el.blur()")
                  ;; Enter: find first substring match and navigate to it
                  :data-on:keydown
-                 (str "if (evt.key !== 'Enter') return; evt.preventDefault(); "
-                      (h/action
-                        (when-let [found (deps/find-artifact db $value)]
-                          (navigate! cursor found))
-                        (reset! search ""))
-                      "; el.value = ''; el.blur()")}]
+                 (str "if (evt.key === 'Enter') { evt.preventDefault(); "
+                      (h/action (when-let [found (deps/find-artifact db $value)]
+                                  (navigate! cursor found))
+                                (reset! search ""))
+                      "; el.value = ''; el.blur() }")}]
         ;; Datalist provides browser-native autocomplete using artifact labels
         [:datalist {:id "artifact-list"}
          (for [k (sort (deps/artifact-keys db))

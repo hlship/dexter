@@ -9,7 +9,7 @@
   babashka/fs                                  {:mvn/version "0.5.32"}
   org.clj-commons/humanize                     {:mvn/version "1.2"}
   dynamic-alpha/hyper                          {:git/url "https://github.com/dynamic-alpha/hyper"
-                                                :git/sha "90bf2daad1c91313aa2eaeac38321539526795d3"}
+                                                :git/sha "895964a5cffd4eada0d158ef7421278737318534"}
   ;; hyper depends on brotli4j, which uses Maven profiles to pull in native
   ;; libraries for the *build* machine's OS/arch only. Explicitly include
   ;; all target platforms so the uberjar works everywhere.
