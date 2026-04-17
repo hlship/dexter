@@ -10,6 +10,12 @@
   org.clj-commons/humanize                     {:mvn/version "1.2"}
   dynamic-alpha/hyper                          {:git/url "https://github.com/dynamic-alpha/hyper"
                                                 :git/sha "90bf2daad1c91313aa2eaeac38321539526795d3"}
+  ;; hyper depends on brotli4j, which uses Maven profiles to pull in native
+  ;; libraries for the *build* machine's OS/arch only. Explicitly include
+  ;; all target platforms so the uberjar works everywhere.
+  com.aayushatharva.brotli4j/native-osx-aarch64  {:mvn/version "1.20.0"}
+  com.aayushatharva.brotli4j/native-osx-x86_64   {:mvn/version "1.20.0"}
+  com.aayushatharva.brotli4j/native-linux-x86_64  {:mvn/version "1.20.0"}
   version-clj/version-clj                      {:mvn/version "2.0.3"}
   leiningen-core/leiningen-core                {:mvn/version "2.12.0"
                                                 :exclusions [org.slf4j/slf4j-nop]}
