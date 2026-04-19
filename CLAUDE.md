@@ -101,6 +101,18 @@ bb test
 
 **REPL workflow:** Load dependency data into the local `*db` atom in `demo.clj`, then call `(service/start! {:db @*db})`. The db value is seeded into Hyper's app-state and flows to views via the request — views never access a global atom directly.
 
+## Release & Startup Optimization
+
+**Packaging:** `bb package` builds the uberjar, launcher script, and release zip (including `aot-training/deps.edn`). `bb release` tags a GitHub release and generates the Homebrew formula from `release/templates/dexter.rb`.
+
+**JDK 25+ AOT cache (Project Leyden):** The launcher script (`release/templates/dexter`) supports `--aot-train` to create a JDK 25+ AOT cache (JEP 483, JEP 514, JEP 515) for faster startup. The cache filename includes a hash of `java -version` output (e.g. `dexter-a1b2c3d4e5f6.aot`), so switching JDKs silently bypasses a stale cache — no errors, no manual cleanup. Running `--aot-train` again cleans up old caches and creates a fresh one.
+
+**AOT training mechanism:** The `--aot-train` flag passes `-Ddexter.dry-run=true` as a JVM system property and `--file aot-training/` (a bundled copy of dexter's own `deps.edn`). The `dexter.dry-run` property triggers a dry-run mode in `main.clj`: the server starts, several HTTP requests exercise the rendering pipeline (page loads, static resources), then the server stops and the JVM exits cleanly — writing the AOT cache on shutdown.
+
+**Homebrew formula:** The `post_install` block runs `dexter --aot-train` so every Homebrew install gets a pre-trained cache. Wrapped in `rescue` so older JDKs don't fail the install.
+
+**Lazy loading is critical for startup:** `main.clj` uses `requiring-resolve` for heavy namespaces (`service`, `browse`, `deps-reader`, `lein-reader`). This keeps the `--help` path fast (~350ms) by deferring the web stack (Hyper, Ring, Reitit, Cheshire — ~150 namespaces) and dep resolution (tools.deps, leiningen-core) until actually needed. Replacing these with static requires would pull everything in eagerly and roughly 4x the startup time.
+
 ## Keyboard Shortcuts
 
 - **⌘F** / **Ctrl+F** — Focus artifact search field

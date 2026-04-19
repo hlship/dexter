@@ -35,7 +35,7 @@
         class-dir (fs/file out-dir "classes")
         build-dir (fs/file out-dir "build")
         _ (do
-            (fs/delete-tree out-dir)
+            (fs/delete-tree out-dir {:force true})
             (fs/create-dirs out-dir)
             (fs/create-dirs class-dir)
             (fs/create-dirs build-dir))
@@ -52,15 +52,21 @@
 
     (sh "chmod a+x" (fs/file build-dir "dexter"))
 
+    ;; Bundle the project's own deps.edn for AOT training
+    (let [aot-dir (fs/file build-dir "aot-training")]
+      (fs/create-dirs aot-dir)
+      (sh "cp" "deps.edn" (str (fs/file aot-dir "deps.edn"))))
+
     (sh "cp -R"
         "LICENSE"
         "README.md"
         "CHANGES.md"
         build-dir)
     (perr "Writing: " [:bold zip-file] " ...")
-    ;; Use system zip (not fs/zip) to preserve executable permissions
-    (apply sh "zip" "-j" (str zip-file)
-           (map str (fs/list-dir build-dir)))
+    ;; Use system zip (not fs/zip) to preserve executable permissions.
+    ;; -r recurses into aot-training/ subdirectory.
+    (sh {:dir build-dir}
+        "zip" "-r" (str (fs/absolutize zip-file)) ".")
     zip-file))
 
 (defn sha256
