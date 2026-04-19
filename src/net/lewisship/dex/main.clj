@@ -4,7 +4,7 @@
             [clj-commons.humanize :as h]
             [net.lewisship.cli-tools :as cli :refer [defcommand abort]]
             [net.lewisship.dex.deps :as deps])
-  (:import (java.net ServerSocket)))
+  (:import (java.net HttpURLConnection ServerSocket URI)))
 
 (defn- free-port
   []
@@ -33,6 +33,40 @@
                 (invoke reader path opts)))
             readers))))
 
+(defn- http-get
+  "Makes a simple HTTP GET request and returns the response body as a string.
+  Returns nil on any error."
+  [url]
+  (try
+    (let [^HttpURLConnection conn
+          (doto (.openConnection (.toURL (URI. url)))
+            (.setRequestMethod "GET")
+            (.setConnectTimeout 5000)
+            (.setReadTimeout 10000))]
+      (try
+        (slurp (.getInputStream conn))
+        (finally
+          (.disconnect conn))))
+    (catch Exception _
+      nil)))
+
+(defn- warm-up!
+  "Exercises the server with HTTP requests to load classes for AOT training.
+  Makes multiple requests to cover: initial page render, layout computation
+  (via simulated viewport size), and static resource loading."
+  [url]
+  (perr [:faint "Warming up server ..."])
+  ;; Initial page render: exercises Ring handler, Hyper rendering,
+  ;; deps/db lookups, toolbar, footer stats, datalist generation.
+  (http-get url)
+  ;; Hit the page a couple more times to exercise SSE/connection paths
+  (http-get url)
+  ;; Request static resources to load those class paths
+  (http-get (str url "/style.css"))
+  (http-get (str url "/js/main.js"))
+  (http-get (str url "/favicon.svg"))
+  (perr [:faint "Warm-up complete."]))
+
 (defcommand -main
   "Dexter is used to explore the dependency graph of a Clojure (or JVM) based project.
   The dependencies, relationships, and versions are analyzed and a browser is launched
@@ -51,6 +85,7 @@
    no-open? [nil "--no-open" "Do not automatically open a browser"]
    :command "dexter"]
   (let [port' (or port (free-port))
+        dry-run? (some? (System/getProperty "dexter.dry-run"))
         path  (-> (or file ".") fs/absolutize fs/normalize)
         data  (read-dependency-data path {:aliases aliases})
         url   (str "http://localhost:" port')]
@@ -66,9 +101,14 @@
                 :maximum-display 100)]))
     (pout [:faint "Running web server at "] [:bold url] " ...")
     ((requiring-resolve 'net.lewisship.dex.service/start!) {:port port'
-                                                           :db (deps/build-db data)})
-    (pout "Hit " [:bold "Ctrl+C"] " when done")
-    (when-not no-open?
-      ((requiring-resolve 'clojure.java.browse/browse-url) url))
-    ;; Hang forever (until ^C)
-    @(promise)))
+                                                            :db (deps/build-db data)})
+    (if dry-run?
+      (do
+        (warm-up! url)
+        ((requiring-resolve 'net.lewisship.dex.service/stop!)))
+      (do
+        (pout "Hit " [:bold "Ctrl+C"] " when done")
+        (when-not no-open?
+          ((requiring-resolve 'clojure.java.browse/browse-url) url))
+        ;; Hang forever (until ^C)
+        @(promise)))))
