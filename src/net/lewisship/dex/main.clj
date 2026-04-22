@@ -13,7 +13,9 @@
 
 (def ^:private readers
   [["deps.edn" 'net.lewisship.dex.deps-reader/read-deps]
-   ["project.clj" 'net.lewisship.dex.lein-reader/read-deps]])
+   ["project.clj" 'net.lewisship.dex.lein-reader/read-deps]
+   ["build.gradle" 'net.lewisship.dex.gradle-reader/read-deps]
+   ["build.gradle.kts" 'net.lewisship.dex.gradle-reader/read-deps]])
 
 (defn- invoke [reader-sym file opts]
   (when (fs/exists? file)

@@ -16,6 +16,7 @@
                                   net.lewisship.dex.service
                                   net.lewisship.dex.deps-reader
                                   net.lewisship.dex.lein-reader
+                                  net.lewisship.dex.gradle-reader
                                   clojure.java.browse]
                     :class-dir  class-dir})
     (b/uber {:class-dir class-dir

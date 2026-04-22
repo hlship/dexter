@@ -21,6 +21,7 @@ Interactive browser-based tool for exploring JVM dependency graphs. Resolves dep
 | `dex.deps` | Core data model — `build-db` indexes artifacts with labels, dependants, and label search index |
 | `dex.deps-reader` | Reads `deps.edn` via `tools.deps`, walks trace tree to produce flat artifact map |
 | `dex.lein-reader` | Reads `project.clj` via leiningen-core APIs, resolves per-artifact deps via Aether |
+| `dex.gradle-reader` | Reads `build.gradle` / `build.gradle.kts` via Gradle subprocess with init script |
 | `dex.layout` | Computes three-column layout: windowed columns, connection graph, version match colors, box annotations |
 | `dex.views` | Hiccup rendering — toolbar, columns, boxes, search, arrow connection JSON |
 | `dex.service` | HTTP lifecycle — routes, Hyper handler, `start!`/`stop!`; db passed as option, seeded into Hyper app-state |

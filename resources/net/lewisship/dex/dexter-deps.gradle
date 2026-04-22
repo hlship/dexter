@@ -1,0 +1,143 @@
+// Dexter dependency analysis init script.
+// Registers a 'dexterDependencies' task on the root project that resolves
+// the dependency graph and emits a flat artifact map as EDN to stdout.
+//
+// Usage: gradle --init-script this-file.gradle --quiet \
+//          [-PdexConfiguration=runtimeClasspath] dexterDependencies
+//
+// The EDN output is wrapped in sentinel markers so the caller can reliably
+// extract it even if Gradle emits warnings or progress output.
+
+rootProject {
+    tasks.register('dexterDependencies') {
+        doLast {
+            def configName = project.hasProperty('dexConfiguration')
+                    ? project.property('dexConfiguration')
+                    : 'runtimeClasspath'
+
+            def targetProject = project
+            def config = project.configurations.findByName(configName)
+
+            // For multi-project builds, try subprojects if root lacks the configuration
+            if (config == null) {
+                for (sub in project.subprojects) {
+                    config = sub.configurations.findByName(configName)
+                    if (config != null) {
+                        targetProject = sub
+                        break
+                    }
+                }
+            }
+
+            if (config == null) {
+                def available = project.configurations.names.sort().join(', ')
+                throw new GradleException(
+                        "Configuration '${configName}' not found. " +
+                        "Available on root project: ${available}")
+            }
+
+            if (!config.canBeResolved) {
+                throw new GradleException(
+                        "Configuration '${configName}' cannot be resolved. " +
+                        "Try 'runtimeClasspath' or 'compileClasspath' instead.")
+            }
+
+            def resolutionResult = config.incoming.resolutionResult
+            def rootComponent = resolutionResult.root
+
+            def visited = new HashSet()
+            def artifacts = new LinkedHashMap()
+
+            // Format a Maven group/artifact as a Clojure symbol.
+            // When group == name (e.g. commons-codec:commons-codec), use the short form.
+            def formatKey = { group, name ->
+                (group == name) ? name : "${group}/${name}"
+            }
+
+            // Minimal EDN string escaping (backslash and double-quote).
+            def escapeEdn = { String s ->
+                s.replace('\\', '\\\\').replace('"', '\\"')
+            }
+
+            // Recursively collect an artifact and its transitive dependencies.
+            Closure walkDeps
+            walkDeps = { component ->
+                def mv = component.moduleVersion
+                if (mv == null) return                    // skip project components
+
+                def key = formatKey(mv.group, mv.name)
+                if (!visited.add(key)) return             // cycle guard
+
+                def deps = new LinkedHashMap()
+                component.dependencies.each { depResult ->
+                    if (depResult instanceof org.gradle.api.artifacts.result.ResolvedDependencyResult) {
+                        def selMv = depResult.selected.moduleVersion
+                        if (selMv == null) return         // skip project dependencies
+
+                        def depKey = formatKey(selMv.group, selMv.name)
+                        def reqVersion =
+                            (depResult.requested instanceof org.gradle.api.artifacts.component.ModuleComponentSelector)
+                                ? depResult.requested.version
+                                : selMv.version
+                        deps[depKey] = reqVersion
+                        walkDeps(depResult.selected)
+                    }
+                }
+
+                artifacts[key] = [version: mv.version, deps: deps]
+            }
+
+            // --- Collect top-level (ROOT) dependencies ---
+            def rootDeps = new LinkedHashMap()
+            rootComponent.dependencies.each { depResult ->
+                if (depResult instanceof org.gradle.api.artifacts.result.ResolvedDependencyResult) {
+                    def selMv = depResult.selected.moduleVersion
+                    if (selMv == null) return
+
+                    def depKey = formatKey(selMv.group, selMv.name)
+                    def reqVersion =
+                        (depResult.requested instanceof org.gradle.api.artifacts.component.ModuleComponentSelector)
+                            ? depResult.requested.version
+                            : selMv.version
+                    rootDeps[depKey] = reqVersion
+                    walkDeps(depResult.selected)
+                }
+            }
+
+            // --- Emit EDN ---
+            def sb = new StringBuilder()
+            sb.append('{')
+
+            // ROOT entry — label is set by the Clojure reader, not here
+            def version = targetProject.version?.toString()
+            if (!version || version == 'unspecified') version = '0.0.0'
+
+            sb.append("ROOT {:version \"${escapeEdn(version)}\"")
+            if (!rootDeps.isEmpty()) {
+                sb.append(' :deps {')
+                rootDeps.each { k, v ->
+                    sb.append("${k} {:version \"${escapeEdn(v)}\"} ")
+                }
+                sb.append('}')
+            }
+            sb.append('}\n')
+
+            artifacts.each { key, info ->
+                sb.append("${key} {:version \"${escapeEdn(info.version)}\"")
+                if (!info.deps.isEmpty()) {
+                    sb.append(' :deps {')
+                    info.deps.each { k, v ->
+                        sb.append("${k} {:version \"${escapeEdn(v)}\"} ")
+                    }
+                    sb.append('}')
+                }
+                sb.append('}\n')
+            }
+
+            sb.append('}')
+            println '===DEXTER-EDN-START==='
+            println sb.toString()
+            println '===DEXTER-EDN-END==='
+        }
+    }
+}

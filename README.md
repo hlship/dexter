@@ -25,7 +25,7 @@ Mousing over a dependency arrow expands it and, for non-exact matches, displays 
 | **tools.deps** (`deps.edn`) | ✅ Supported |
 | **Leiningen** (`project.clj`) | ✅ Supported |
 | **Maven** (`pom.xml`) | 🔜 Planned |
-| **Gradle** (`build.gradle`) | 🔜 Planned |
+| **Gradle** (`build.gradle` / `build.gradle.kts`) | ✅ Supported |
 
 ## Installation
 
@@ -68,6 +68,12 @@ dexter -f /path/to/project -a dev
 
 # Leiningen project with dev and test profiles
 dexter -f /path/to/project.clj -a dev -a test
+
+# Gradle project (uses runtimeClasspath by default)
+dexter -f /path/to/build.gradle
+
+# Gradle project with a specific configuration
+dexter -f /path/to/build.gradle -a testRuntimeClasspath
 
 # Use a specific port, don't open browser
 dexter -p 8080 -O
