@@ -41,7 +41,6 @@
 
   (service/start! {:db @*db})
 
-  (service/stop!)
 
   (do
     (reload)
