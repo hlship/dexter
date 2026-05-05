@@ -8,7 +8,8 @@
             [hyper.client-params :as cp]
             [hyper.core :as h]
             [net.lewisship.dex.deps :as deps]
-            [net.lewisship.dex.layout :as layout]))
+            [net.lewisship.dex.layout :as layout]
+            [net.lewisship.dex.pom :as pom]))
 
 ;; Extend Hyper's client-param registry so that $scroll-delta-y can be used
 ;; inside h/action forms to receive the wheel event's deltaY on the server.
@@ -52,8 +53,8 @@
              (fn [view]
                (-> view
                    (update :nav-history (fnil conj [])
-                           {:selected     (:selected view)
-                            :left-offset  (:left-offset view)
+                           {:selected (:selected view)
+                            :left-offset (:left-offset view)
                             :right-offset (:right-offset view)})
                    (assoc :selected artifact-key
                           :left-offset 0
@@ -81,14 +82,14 @@
   [cursor db artifact-key]
   (swap! cursor
          (fn [state]
-           (let [id    (:next-id state)
+           (let [id (:next-id state)
                  label (:label (deps/artifact-info db artifact-key))]
              (-> state
                  (update :tabs conj {:id id :root artifact-key :label label})
-                 (assoc-in [:views id] {:selected     artifact-key
-                                        :left-offset  0
+                 (assoc-in [:views id] {:selected artifact-key
+                                        :left-offset 0
                                         :right-offset 0
-                                        :nav-history  []})
+                                        :nav-history []})
                  (assoc :active-tab id)
                  (update :next-id inc)
                  (update :tab-history conj id))))))
@@ -119,13 +120,18 @@
 
 ;; --- Column Scrolling ---
 
+(defn- toggle-properties!
+  "Toggles the right-side properties panel on or off."
+  [cursor]
+  (swap! cursor update :show-properties? not))
+
 (defn- scroll-offset
   "Returns a function that adjusts a column offset by `delta` (+1 or -1),
   clamping to [0, total - max-visible].  `column-key` is the layout key
   (:left or :right) used to look up the windowed column data."
   [db cursor column-key delta]
   (let [state @cursor
-        view  (active-view state)
+        view (active-view state)
         {:keys [selected left-offset right-offset]} view
         {:keys [hidden-libs max-visible]} state
         layout-data (layout/compute-layout db selected left-offset right-offset
@@ -141,13 +147,11 @@
 (defn- render-box
   "Renders a single artifact box as a Tailwind-styled div.
   select-action is a Datastar expression string returned by h/action.
-  open-tab-action, when non-nil, renders a small icon in the upper-left
-  corner to open a new tab rooted at this artifact.
   Leaf nodes (no dependencies) are annotated with a grey right border marker.
   Dependencies with version mismatches get a colored right border."
-  [{:keys [key name version leaf? version-color]} selected? select-action open-tab-action]
+  [{:keys [key name version leaf? version-color]} selected? select-action]
   [:div {:id (str "box-" key)
-         :class (str "group w-full rounded-lg border-2 cursor-pointer "
+         :class (str "w-full rounded-lg border-2 cursor-pointer "
                      "transition-colors duration-150 "
                      (if selected?
                        "border-blue-500 bg-blue-50 shadow-md"
@@ -160,30 +164,10 @@
          :style (when version-color
                   (str "border-right-color: " version-color))
          :data-on:click select-action}
-   ;; Flex row: text content on the left, optional open-tab button on the right.
-   ;; The button is in the content flow so it aligns consistently regardless
-   ;; of right border width. The group class enables group-hover on the button.
-   [:div {:class (str "flex items-start gap-1 pl-4 py-2 "
-                      ;; Compensate for the 8px difference between border-r-[10px]
-                      ;; (annotated) and border-2 (normal) so that content width —
-                      ;; and thus the open-tab button — aligns across all boxes.
+   [:div {:class (str "pl-4 py-2 "
                       (if (or version-color leaf?) "pr-4" "pr-6"))}
-    [:div {:class "flex-1 min-w-0"}
-     [:div {:class "font-semibold text-sm text-slate-800 truncate" :title name} name]
-     [:div {:class "text-xs text-slate-500"} version]]
-    (when open-tab-action
-      [:button {:class (str "shrink-0 w-5 h-5 -mt-1.5 -mr-3 rounded-full bg-white border "
-                            "border-slate-300 flex items-center justify-center shadow-sm "
-                            "text-slate-400 cursor-pointer "
-                            "opacity-0 group-hover:opacity-100 "
-                            "hover:text-blue-500 hover:border-blue-400 transition-all")
-                :title "Open in new tab"
-                :data-on:click__stop open-tab-action}
-       ;; Plus icon
-       [:svg {:class "w-3 h-3" :viewBox "0 0 12 12" :fill "none"
-              :stroke "currentColor" :stroke-width "2" :stroke-linecap "round"
-              :xmlns "http://www.w3.org/2000/svg"}
-        [:path {:d "M6 2v8M2 6h8"}]]])]])
+    [:div {:class "font-semibold text-sm text-slate-800 truncate" :title name} name]
+    [:div {:class "text-xs text-slate-500"} version]]])
 
 (defn- render-overflow-indicator
   "Renders an 'N more above/below' indicator for windowed columns.
@@ -204,9 +188,8 @@
 
 (defn- render-column
   "Renders a column of artifact boxes with optional overflow indicators.
-  The column fills its parent's height and vertically centers its boxes.
-  tab-roots is a set of artifact keys that already have tabs."
-  [{:keys [boxes before after]} column selected-key cursor db tab-roots]
+  The column fills its parent's height and vertically centers its boxes."
+  [{:keys [boxes before after]} column selected-key cursor db]
   (let [offset-key (case column :left :left-offset :right :right-offset)]
     [:div {:class "dep-column relative flex flex-col justify-center gap-3 w-[280px] h-full"
            :data-on:wheel__prevent__throttle.150ms
@@ -224,9 +207,7 @@
                                  (scroll-offset db cursor column -1))))))
      (for [box boxes]
        (render-box box (= (:key box) selected-key)
-                   (h/action (navigate! cursor (:key box)))
-                   (when-not (tab-roots (:key box))
-                     (h/action (open-tab! cursor db (:key box))))))
+                   (h/action (navigate! cursor (:key box)))))
      (render-overflow-indicator
       after :down
       (h/action (swap! cursor update-active-view
@@ -257,18 +238,18 @@
 
 (def ^:private category-config
   "Display configuration for each version-match category."
-  {:compatible   {:label       "compatible"
-                  :title       "Compatible Dependencies"
-                  :text-class  "text-green-600"
-                  :badge-class "badge-success"}
-   :incompatible {:label       "incompatible"
-                  :title       "Incompatible Dependencies"
-                  :text-class  "text-red-600 font-semibold"
+  {:compatible {:label "compatible"
+                :title "Compatible Dependencies"
+                :text-class "text-green-600"
+                :badge-class "badge-success"}
+   :incompatible {:label "incompatible"
+                  :title "Incompatible Dependencies"
+                  :text-class "text-red-600 font-semibold"
                   :badge-class "badge-error"}
-   :unknown      {:label       "unknown"
-                  :title       "Unknown Compatibility"
-                  :text-class  "text-yellow-600"
-                  :badge-class "badge-warning"}})
+   :unknown {:label "unknown"
+             :title "Unknown Compatibility"
+             :text-class "text-yellow-600"
+             :badge-class "badge-warning"}})
 
 (defn- render-footer-popup
   "Renders a modal popup listing artifacts for a version-match category.
@@ -276,18 +257,18 @@
   that navigate to the artifact and close the popup."
   [cursor db category]
   (let [{:keys [title badge-class]} (category-config category)
-        search        (h/tab-cursor :footer-search "")
-        search-text   (string/lower-case (str @search))
+        search (h/tab-cursor :footer-search "")
+        search-text (string/lower-case (str @search))
         all-artifacts (get (layout/artifacts-by-match db) category)
-        artifacts     (if (seq search-text)
-                        (filterv #(string/includes?
-                                   (string/lower-case (:label %))
-                                   search-text)
-                                 all-artifacts)
-                        all-artifacts)
-        close-action  (h/action
-                        (swap! cursor assoc :footer-popup nil)
-                        (reset! search ""))]
+        artifacts (if (seq search-text)
+                    (filterv #(string/includes?
+                               (string/lower-case (:label %))
+                               search-text)
+                             all-artifacts)
+                    all-artifacts)
+        close-action (h/action
+                      (swap! cursor assoc :footer-popup nil)
+                      (reset! search ""))]
     [:div {:class "modal modal-open"
            :data-on:keydown__window
            (str "if (evt.key === 'Escape') { evt.preventDefault(); "
@@ -308,10 +289,10 @@
       ;; Search field (shown when enough items to warrant filtering)
       (when (> (count all-artifacts) 8)
         [:input {:class "input input-bordered input-sm w-full mb-3"
-                 :type        "text"
+                 :type "text"
                  :placeholder "Filter..."
-                 :value       @search
-                 :data-init   "el.focus()"
+                 :value @search
+                 :data-init "el.focus()"
                  :data-on:input
                  (str (h/action (reset! search $value)))
                  ;; Enter navigates to the first visible match
@@ -331,18 +312,18 @@
            (map-indexed
             (fn [idx {:keys [key label]}]
               (let [select-action (h/action
-                                    (navigate! cursor key)
-                                    (swap! cursor assoc :footer-popup nil)
-                                    (reset! search ""))]
-                [:li {:class    "py-1.5 px-2 rounded cursor-pointer text-sm truncate
+                                   (navigate! cursor key)
+                                   (swap! cursor assoc :footer-popup nil)
+                                   (reset! search ""))]
+                [:li {:class "py-1.5 px-2 rounded cursor-pointer text-sm truncate
                                  transition-colors outline-none
                                  hover:bg-base-200 focus:bg-base-200 focus:ring-1 focus:ring-blue-400"
                       :tabindex "0"
-                      :title    label
+                      :title label
                       ;; Auto-focus first item when there's no search field
                       :data-init (when (and (zero? idx) (not has-search?))
                                    "el.focus()")
-                      :data-on:click   (str select-action)
+                      :data-on:click (str select-action)
                       :data-on:keydown
                       (str "if (evt.key === 'Enter') { evt.preventDefault(); "
                            (h/action (navigate! cursor key)
@@ -369,7 +350,7 @@
         accel (category-accel category)]
     [:button {:class (str "tooltip tooltip-top " text-class
                           " hover:underline cursor-pointer bg-transparent border-none p-0")
-              :data-accel         accel
+              :data-accel accel
               :data-preserve-attr "data-tip"
               :data-on:click (h/action (swap! cursor assoc :footer-popup category))}
      (str count " " label)]))
@@ -381,7 +362,7 @@
   [cursor db]
   (let [{:keys [artifact-count dep-count compatible incompatible unknown]}
         (layout/summary-stats db)
-        summary   (str artifact-count " artifacts; " dep-count " dependencies")
+        summary (str artifact-count " artifacts; " dep-count " dependencies")
         popup-cat (:footer-popup @cursor)
         parts (cond-> []
                 (pos? (or compatible 0))
@@ -402,6 +383,159 @@
      ;; Render popup when a category is selected
      (when popup-cat
        (render-footer-popup cursor db popup-cat)))))
+
+;; --- Properties Panel ---
+
+(def ^:private match-order
+  "Display order for version-match categories in the properties panel."
+  [:exact :compatible :incompatible :unknown])
+
+(def ^:private match-labels
+  "Human-readable labels for each version-match category."
+  {:exact "Exact"
+   :compatible "Compatible"
+   :incompatible "Incompatible"
+   :unknown "Unknown"})
+
+(def ^:private match-text-classes
+  "Tailwind text color classes for each version-match category."
+  {:exact "text-slate-800"
+   :compatible "text-green-600"
+   :incompatible "text-red-600"
+   :unknown "text-yellow-600"})
+
+(defn- count-by-match
+  "Counts connections by version-match category.
+  Returns a map of category keyword to count."
+  [connections]
+  (frequencies
+   (map (fn [{:keys [requested-version resolved-version]}]
+          (layout/version-match requested-version resolved-version))
+        connections)))
+
+(defn- render-match-counts
+  "Renders a compact list of non-zero version-match category counts."
+  [counts-by-match]
+  [:div {:class "space-y-1"}
+   (for [match match-order
+         :let [n (get counts-by-match match 0)]
+         :when (pos? n)]
+     [:div {:class (str "text-sm " (match-text-classes match))}
+      (str n " " (string/lower-case (match-labels match)))])])
+
+(defn- render-properties-panel
+  "Renders an overlay panel on the right side of the dep-viewer showing
+  details for the currently selected artifact: full name, version, and
+  dependencies/dependants broken down by version-match category.
+  tab-roots is a set of artifact keys that already have open tabs.
+  hidden-libs is a set of artifact keys to exclude from counts."
+  [cursor db selected-box tab-roots hidden-libs]
+  (let [{:keys [key name version]} selected-box
+        dependencies (remove #(contains? hidden-libs (:to %)) (deps/dependencies db key))
+        dependants   (remove #(contains? hidden-libs (:from %)) (deps/dependants db key))
+        has-tab?     (contains? tab-roots key)
+        {:keys [description url jar-size licenses]} (pom/pom-metadata key version)]
+    [:div {:class "absolute right-0 top-0 h-full w-80 bg-white border-l border-slate-200
+                   shadow-lg z-10 flex flex-col overflow-hidden"}
+     ;; Header with close button
+     [:div {:class "flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0"}
+      [:h3 {:class "font-semibold text-sm text-slate-700"} "Properties"]
+      [:button {:class "btn btn-sm btn-circle btn-ghost"
+                :data-on:click (h/action (toggle-properties! cursor))}
+       "✕"]]
+     ;; Scrollable content
+     [:div {:class "px-4 py-3 space-y-4 overflow-y-auto flex-1 min-h-0"}
+      ;; Full artifact name — no truncation
+      [:div
+       [:div {:class "text-xs font-medium text-slate-400 uppercase tracking-wide mb-1"}
+        "Artifact"]
+       (let [[group artifact] (string/split name #"/" 2)]
+         (if artifact
+           [:div {:class "text-sm break-all"}
+            [:span {:class "text-slate-500"} group]
+            [:span {:class "text-slate-400"} " / "]
+            [:span {:class "text-slate-800 font-semibold"} artifact]]
+           [:div {:class "text-sm text-slate-800 font-semibold break-all"} name]))]
+      ;; Version
+      [:div
+       [:div {:class "text-xs font-medium text-slate-400 uppercase tracking-wide mb-1"}
+        "Version"]
+       [:div {:class "text-sm text-slate-800 font-mono"} version]]
+      ;; JAR size
+      (when jar-size
+        [:div
+         [:div {:class "text-xs font-medium text-slate-400 uppercase tracking-wide mb-1"}
+          "JAR Size"]
+         [:div {:class "text-sm text-slate-800"} jar-size]])
+      ;; Description from POM
+      (when description
+        [:div
+         [:div {:class "text-xs font-medium text-slate-400 uppercase tracking-wide mb-1"}
+          "Description"]
+         [:div {:class "text-sm text-slate-600"} description]])
+      ;; License from POM
+      (when (seq licenses)
+        [:div
+         [:div {:class "text-xs font-medium text-slate-400 uppercase tracking-wide mb-1"}
+          "License"]
+         (for [{:keys [name url]} licenses]
+           (if url
+             [:div
+              [:a {:class  "text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                   :href   url
+                   :target "_blank"
+                   :rel    "noopener noreferrer"}
+               name]]
+             [:div {:class "text-sm text-slate-800"} name]))])
+      ;; Homepage URL from POM
+      (when url
+        [:div
+         [:div {:class "text-xs font-medium text-slate-400 uppercase tracking-wide mb-1"}
+          "Homepage"]
+         [:a {:class  "text-sm text-blue-600 hover:text-blue-800 hover:underline break-all"
+              :href   url
+              :target "_blank"
+              :rel    "noopener noreferrer"}
+          url]])
+      ;; Maven Repository link
+      (when (or description url)
+        (let [[group artifact] (string/split name #"/" 2)
+              mvn-url (str "https://mvnrepository.com/artifact/"
+                           group "/" (or artifact group) "/" version)]
+          [:div
+           [:div {:class "text-xs font-medium text-slate-400 uppercase tracking-wide mb-1"}
+            "Maven Repository"]
+           [:a {:class  "text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                :href   mvn-url
+                :target "_blank"
+                :rel    "noopener noreferrer"}
+            "mvnrepository.com"]]))
+      ;; Open in new tab button
+      [:div
+       [:button {:class (str "btn btn-sm btn-outline gap-1 "
+                             (when has-tab? "btn-disabled"))
+                 :disabled has-tab?
+                 :data-on:click (when-not has-tab?
+                                  (h/action (open-tab! cursor db key)))}
+        [:svg {:class "w-4 h-4" :viewBox "0 0 12 12" :fill "none"
+               :stroke "currentColor" :stroke-width "1.5" :stroke-linecap "round"
+               :xmlns "http://www.w3.org/2000/svg"}
+         [:path {:d "M6 2v8M2 6h8"}]]
+        "Open in new tab"]]
+      ;; Dependencies section
+      [:div
+       [:div {:class "text-xs font-medium text-slate-400 uppercase tracking-wide mb-2"}
+        (str "Dependencies (" (count dependencies) ")")]
+       (if (seq dependencies)
+         (render-match-counts (count-by-match dependencies))
+         [:div {:class "text-sm text-slate-400 italic"} "None"])]
+      ;; Dependants section
+      [:div
+       [:div {:class "text-xs font-medium text-slate-400 uppercase tracking-wide mb-2"}
+        (str "Dependants (" (count dependants) ")")]
+       (if (seq dependants)
+         (render-match-counts (count-by-match dependants))
+         [:div {:class "text-sm text-slate-400 italic"} "None"])]]]))
 
 ;; --- Page Rendering ---
 
@@ -427,38 +561,38 @@
 (defn- render-toolbar
   "Renders the top toolbar with navigation controls, tabs, and artifact search."
   [cursor db]
-  (let [state     @cursor
-        view      (active-view state)
-        tab-root  (active-tab-root state)
-        selected  (:selected view)
-        tabs      (:tabs state)
+  (let [state @cursor
+        view (active-view state)
+        tab-root (active-tab-root state)
+        selected (:selected view)
+        tabs (:tabs state)
         active-id (:active-tab state)]
-    [:div {:class "bg-white border-b border-slate-200 shadow-sm px-4 py-2 flex items-center gap-3 shrink-0"}
+    [:div {:class "bg-white border-b border-slate-200 shadow-sm px-4 py-2 flex items-center gap-3 shrink-0 z-20 relative"}
      ;; Home button — navigates to the root artifact of the active tab
      [:button.btn.btn-square.btn-sm.tooltip.tooltip-bottom
-      {:disabled           (= selected tab-root)
-       :data-accel         "h"
+      {:disabled (= selected tab-root)
+       :data-accel "h"
        :data-preserve-attr "data-tip"
-       :data-on:click      (h/action
-                             (let [root (active-tab-root @cursor)]
-                               (navigate! cursor root)))}
+       :data-on:click (h/action
+                       (let [root (active-tab-root @cursor)]
+                         (navigate! cursor root)))}
       ;; Home icon (SVG)
       [:svg {:class "w-5 h-5" :viewBox "0 0 20 20" :fill "currentColor"
              :xmlns "http://www.w3.org/2000/svg"}
        [:path {:fill-rule "evenodd" :clip-rule "evenodd"
-               :d         "M9.293 2.293a1 1 0 011.414 0l7 7A1 1 0 0117 11h-1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-3a1 1 0 00-1-1H9a1 1 0 00-1 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-6H3a1 1 0 01-.707-1.707l7-7z"}]]]
+               :d "M9.293 2.293a1 1 0 011.414 0l7 7A1 1 0 0117 11h-1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-3a1 1 0 00-1-1H9a1 1 0 00-1 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-6H3a1 1 0 01-.707-1.707l7-7z"}]]]
      ;; Back button — per-tab navigation history
      [:button.btn.btn-square.btn-sm.tooltip.tooltip-bottom
-      {:disabled           (empty? (:nav-history view))
-       :data-accel         "b"
+      {:disabled (empty? (:nav-history view))
+       :data-accel "b"
        :data-preserve-attr "data-tip"
-       :data-on:click      (h/action
-                             (navigate-back! cursor))}
+       :data-on:click (h/action
+                       (navigate-back! cursor))}
       ;; Back arrow icon (SVG)
       [:svg {:class "w-5 h-5" :viewBox "0 0 20 20" :fill "currentColor"
              :xmlns "http://www.w3.org/2000/svg"}
        [:path {:fill-rule "evenodd" :clip-rule "evenodd"
-               :d         "M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z"}]]]
+               :d "M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z"}]]]
 
      ;; Separator
      [:div {:class "w-px h-6 bg-slate-200"}]
@@ -473,26 +607,38 @@
          (for [tab (rest tabs)]
            (render-tab cursor tab (= (:id tab) active-id)))])]
 
+     ;; Properties panel toggle
+     [:button.btn.btn-square.btn-sm.tooltip.tooltip-bottom
+      {:data-accel "i"
+       :data-preserve-attr "data-tip"
+       :class (when (:show-properties? state) "btn-active")
+       :data-on:click (h/action (toggle-properties! cursor))}
+      ;; Info icon (SVG) — circled "i"
+      [:svg {:class "w-5 h-5" :viewBox "0 0 20 20" :fill "currentColor"
+             :xmlns "http://www.w3.org/2000/svg"}
+       [:path {:fill-rule "evenodd" :clip-rule "evenodd"
+               :d "M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z"}]]]
+
      ;; Artifact search
      (let [search (h/tab-cursor :search "")]
        [:div.relative.shrink-0
         ;; NOTE: No accelerator tooltip for the text field because it would be active
         ;; anytime the field was focused, which is too much.
-        [:input {:id             "artifact-search"
-                 :class          "w-64 px-3 py-1.5 text-sm border border-slate-300 rounded-lg
+        [:input {:id "artifact-search"
+                 :class "w-64 px-3 py-1.5 text-sm border border-slate-300 rounded-lg
                          focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400"
-                 :type           "text"
-                 :placeholder    "Search..."
-                 :data-accel     "f"
-                 :list           "artifact-list"
-                 :value          @search
+                 :type "text"
+                 :placeholder "Search..."
+                 :data-accel "f"
+                 :list "artifact-list"
+                 :value @search
                  ;; Idiomorph preserves focused input values, so we need both:
                  ;; - server-side reset! to keep cursor state clean
                  ;; - client-side el.value/blur to clear the visible input immediately
                  :data-on:change (str (h/action
-                                        (when-let [k (deps/find-artifact db $value)]
-                                          (navigate! cursor k))
-                                        (reset! search ""))
+                                       (when-let [k (deps/find-artifact db $value)]
+                                         (navigate! cursor k))
+                                       (reset! search ""))
                                       "; el.value = ''; el.blur()")
                  ;; Enter: find first substring match and navigate to it
                  :data-on:keydown
@@ -508,25 +654,25 @@
            [:option {:value label}])]])]))
 
 (defn home-page [req]
-  (let [db          (:db @(:hyper/app-state req))
-        root-label  (:label (deps/artifact-info db 'ROOT))
-        cursor      (h/tab-cursor :view
-                                  {:tabs        [{:id 0 :root 'ROOT :label root-label}]
-                                   :active-tab  0
-                                   :next-id     1
-                                   :tab-history [0]
-                                   :views       {0 {:selected     'ROOT
-                                                    :left-offset  0
-                                                    :right-offset 0
-                                                    :nav-history  []}}
-                                   :hidden-libs layout/default-hidden-libs
-                                   :max-visible nil
-                                   :footer-popup nil})
-        state       @cursor
-        view        (active-view state)
+  (let [db (:db @(:hyper/app-state req))
+        root-label (:label (deps/artifact-info db 'ROOT))
+        cursor (h/tab-cursor :view
+                             {:tabs [{:id 0 :root 'ROOT :label root-label}]
+                              :active-tab 0
+                              :next-id 1
+                              :tab-history [0]
+                              :views {0 {:selected 'ROOT
+                                         :left-offset 0
+                                         :right-offset 0
+                                         :nav-history []}}
+                              :hidden-libs layout/default-hidden-libs
+                              :max-visible nil
+                              :footer-popup nil})
+        state @cursor
+        view (active-view state)
         {:keys [selected left-offset right-offset]} view
-        {:keys [hidden-libs max-visible]} state
-        tab-roots   (tab-root-set state)
+        {:keys [hidden-libs max-visible show-properties?]} state
+        tab-roots (tab-root-set state)
         ;; Defer layout computation until the client has reported viewport
         ;; dimensions (max-visible). The dep-viewer container must always
         ;; render so data-track-height can measure it and fire the change
@@ -565,17 +711,18 @@
                 :data-ignore-morph true}]
 
          ;; Left column: dependants
-         (render-column (:left layout-data) :left selected cursor db tab-roots)
+         (render-column (:left layout-data) :left selected cursor db)
 
          ;; Center: selected artifact
          [:div {:class "relative flex flex-col justify-center w-[280px] h-full"}
-          (render-box (:selected-box layout-data) true
-                      (h/action)
-                      (when-not (tab-roots selected)
-                        (h/action (open-tab! cursor db selected))))]
+          (render-box (:selected-box layout-data) true (h/action))]
 
          ;; Right column: dependencies
-         (render-column (:right layout-data) :right selected cursor db tab-roots)))]
+         (render-column (:right layout-data) :right selected cursor db)
+
+         ;; Properties panel overlay (when toggled on)
+         (when show-properties?
+           (render-properties-panel cursor db (:selected-box layout-data) tab-roots hidden-libs))))]
 
      ;; Footer with summary statistics and optional category popup
      (render-footer cursor db)
