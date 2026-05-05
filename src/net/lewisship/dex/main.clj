@@ -13,7 +13,8 @@
 
 (def ^:private readers
   [["deps.edn" 'net.lewisship.dex.deps-reader/read-deps]
-   ["project.clj" 'net.lewisship.dex.lein-reader/read-deps]])
+   ["project.clj" 'net.lewisship.dex.lein-reader/read-deps]
+   ["pom.xml" 'net.lewisship.dex.maven-reader/read-deps]])
 
 (defn- invoke [reader-sym file opts]
   (when (fs/exists? file)

@@ -6,6 +6,7 @@
             [net.lewisship.dex.deps :as deps]
             [net.lewisship.dex.deps-reader :as deps-reader]
             [net.lewisship.dex.lein-reader :as lein-reader]
+            [net.lewisship.dex.maven-reader :as maven-reader]
             [net.lewisship.dex.service :as service]))
 
 ;; Holds the current db for REPL convenience; load data into this atom,
@@ -30,6 +31,10 @@
 
   (reset! *db
           (-> (lein-reader/read-deps (fs/file "../../nubank/balatro/project.clj") nil)
+              deps/build-db))
+
+  (reset! *db
+          (-> (maven-reader/read-deps (fs/file "../spring-petclinic/pom.xml") nil)
               deps/build-db))
 
   ;; --- Server lifecycle ---

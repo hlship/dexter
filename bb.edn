@@ -1,7 +1,7 @@
 {:paths ["release"]
  :deps  {babashka/process       {:mvn/version "0.6.25"}
-         babashka/fs            {:mvn/version "0.5.32"}
-         org.clj-commons/pretty {:mvn/version "3.6.8"}}
+         babashka/fs            {:mvn/version "0.5.33"}
+         org.clj-commons/pretty {:mvn/version "3.8.0"}}
  :tasks
  {:requires ([babashka.process :as p]
              [babashka.fs :as fs]
