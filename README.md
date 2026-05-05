@@ -86,6 +86,19 @@ dexter -p 8080 -O
 
 Click any artifact to make it the new selection. The display animates to show its dependants and dependencies.
 
+### Property Panel 
+ 
+Click the  icon (or type `⌘I`) to open a property panel for the selected dependency (in the center):
+
+![Property Panel](docs/images/property-panel.png)
+
+The property panel floats above the main user interface.
+
+The exact information displayed will vary dependending on what information is available in the Maven POM file for
+the dependency (if it even exists).
+
+## Search 
+
 ### Tabs
 
 Dexter supports multiple tabs, each providing an independent view into the dependency tree.
@@ -94,7 +107,7 @@ Dexter supports multiple tabs, each providing an independent view into the depen
 ![Tabs](docs/images/tabs.png)
 
 - The **ROOT tab** is always present and cannot be closed; it shows the full project dependency tree
-- Hover over any artifact box to reveal a **⊕ button** — click it to open a new tab rooted at that artifact
+- Use the button in the property panel to open a new tab rooted in that dependency
 - Each tab maintains its own **navigation history** — the Home and Back buttons apply to the current tab
 - Tabs that are no longer needed can be closed with the **× button**; closing a tab switches to the most recently viewed tab
 - When many tabs are open, they scroll horizontally (but the root tab stays pinned to the left side)
@@ -114,15 +127,16 @@ Hover over any arrow to highlight it and see the requested version.
 
 ### Box Annotations
 
-<!-- TODO: add screenshot showing box annotations and open-tab button -->
-![Box Annotations](docs/images/box-annotations.png)
+The right border of each dependency provides information on that artifact's dependencies:
 
 - **Wide colored right border** — the artifact has a dependency with a version mismatch (color reflects the worst mismatch)
 - **Wide grey right border** — the artifact is a leaf node (no further dependencies)
 
 ### Dependency Status Popups
 
-The footer bar displays summary counts of compatible, incompatible, and unknown dependency relationships. Click any count (or use `⌘1`/`⌘2`/`⌘3`) to open a popup listing all artifacts in that category.
+The footer bar displays summary counts of compatible, incompatible, and unknown dependency relationships. Click any count (or use `⌘1`/`⌘2`/`⌘3`) to open a popup listing all artifacts in that category:
+
+![Deps](docs/images/compatible-deps.png)
 
 - **Filter** — type to narrow the list (appears when there are more than eight items)
 - **Navigate** — click an artifact or press `Enter` to navigate to it
