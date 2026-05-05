@@ -24,7 +24,7 @@ Mousing over a dependency arrow expands it and, for non-exact matches, displays 
 |---|---|
 | **tools.deps** (`deps.edn`) | ✅ Supported |
 | **Leiningen** (`project.clj`) | ✅ Supported |
-| **Maven** (`pom.xml`) | 🔜 Planned |
+| **Maven** (`pom.xml`) | ✅ Supported |
 | **Gradle** (`build.gradle`) | 🔜 Planned |
 
 ## Installation
@@ -68,6 +68,9 @@ dexter -f /path/to/project -a dev
 
 # Leiningen project with dev and test profiles
 dexter -f /path/to/project.clj -a dev -a test
+
+# Maven project with a specific profile
+dexter -f /path/to/pom.xml -a development
 
 # Use a specific port, don't open browser
 dexter -p 8080 -O
