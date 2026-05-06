@@ -50,6 +50,10 @@
                      (fs/file build-dir "dexter")
                      {:uber-jar (fs/file-name uber-file)})
 
+    (render-template "templates/dexter.cmd"
+                     (fs/file build-dir "dexter.cmd")
+                     {:uber-jar (fs/file-name uber-file)})
+
     (sh "chmod a+x" (fs/file build-dir "dexter"))
 
     (sh "cp -R"

@@ -33,15 +33,23 @@ Mousing over a dependency arrow expands it and, for non-exact matches, displays 
 
 Install with `brew install hlship/brew/dexter`.
 
-### Linux (or manual)
+### Windows (Scoop)
+
+Install with [Scoop](https://scoop.sh/):
+
+```
+scoop bucket add hlship https://github.com/hlship/scoop-bucket
+scoop install dexter
+```
+
+### Linux, Windows (manual)
 
 Download Dexter from [GitHub Releases](https://github.com/hlship/dexter/releases)
-and unpack the distribution, which includes the `dexter` script, and the JAR file
-containing the code.
+and unpack the distribution, which includes launcher scripts (`dexter` for
+macOS/Linux, `dexter.cmd` for Windows) and the JAR file containing the code.
 
-Copy the two files to a directory on your `$PATH`, _or_, create a symlink
-for the `dexter` script in a directory on your `$PATH` (the script will follow 
-symlinks to find the JAR).
+Copy the files to a directory on your `PATH`. On macOS/Linux you can alternatively
+create a symlink for the `dexter` script (it will follow symlinks to find the JAR).
 
 ## Usage
 

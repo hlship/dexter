@@ -34,7 +34,7 @@
               (let [f (fs/file project-dir wrapper-name)]
                 (when (fs/exists? f)
                   (str (fs/absolutize f)))))
-            ["mvnw" "mvnw.cmd"])
+            ["mvnw.cmd" "mvnw"])
       (some-> (fs/which "mvn") str)))
 
 (defn- parse-coordinate

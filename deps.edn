@@ -16,6 +16,7 @@
   com.aayushatharva.brotli4j/native-osx-aarch64  {:mvn/version "1.23.0"}
   com.aayushatharva.brotli4j/native-osx-x86_64   {:mvn/version "1.23.0"}
   com.aayushatharva.brotli4j/native-linux-x86_64  {:mvn/version "1.23.0"}
+  com.aayushatharva.brotli4j/native-windows-x86_64 {:mvn/version "1.23.0"}
   version-clj/version-clj                      {:mvn/version "2.0.3"}
   leiningen-core/leiningen-core                {:mvn/version "2.12.0"
                                                 :exclusions [org.slf4j/slf4j-nop]}

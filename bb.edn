@@ -42,4 +42,15 @@
                  :uber-jar (str "dexter-" tag ".jar")
                  :zip-name (fs/file-name zip-file)})
               (println)
-              (pout "Wrote formula to " [:bold formula]))}}
+              (pout "Wrote formula to " [:bold formula])
+              (let [scoop-manifest (-> zip-file fs/parent (fs/file "dexter.json"))]
+                (r/render-template "templates/dexter.json"
+                  scoop-manifest
+                  {:tag      tag
+                   :sha      sha
+                   :uber-jar (str "dexter-" tag ".jar")
+                   :zip-name (fs/file-name zip-file)})
+                (pout "Wrote Scoop manifest to " [:bold scoop-manifest])
+                (println)
+                (pout "To update the Scoop bucket, copy " [:bold scoop-manifest]
+                  " to the " [:bold "hlship/scoop-bucket"] " repo.")))}}
