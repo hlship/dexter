@@ -62,7 +62,9 @@ jobs:
 
       - name: Install Java
         shell: pwsh
-        run: scoop install java/temurin-lts-jdk
+        run: |
+          scoop bucket add java
+          scoop install java/temurin-lts-jdk
 
       - name: Add dexter bucket and install
         shell: pwsh
