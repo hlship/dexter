@@ -49,7 +49,7 @@ jobs:
   # Verify that the published Scoop package installs and runs on Windows
   windows-install:
     runs-on: windows-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # TODO: restore condition after verifying: if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
       - name: Install Scoop
