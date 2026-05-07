@@ -45,3 +45,29 @@ jobs:
 
       - name: Test
         run: bb test
+
+  # Verify that the published Scoop package installs and runs on Windows
+  windows-install:
+    runs-on: windows-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Install Scoop
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+          Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+
+      - name: Install Java
+        shell: pwsh
+        run: scoop install java/temurin-lts-jdk
+
+      - name: Add dexter bucket and install
+        shell: pwsh
+        run: |
+          scoop bucket add hlship https://github.com/hlship/scoop-bucket
+          scoop install dexter
+
+      - name: Verify dexter runs
+        shell: pwsh
+        run: dexter --help
