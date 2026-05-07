@@ -120,10 +120,7 @@
 
 ;; --- Column Scrolling ---
 
-(defn- toggle-properties!
-  "Toggles the right-side properties panel on or off."
-  [cursor]
-  (swap! cursor update :show-properties? not))
+
 
 (defn- scroll-offset
   "Returns a function that adjusts a column offset by `delta` (+1 or -1),
@@ -435,14 +432,11 @@
         dependants   (remove #(contains? hidden-libs (:from %)) (deps/dependants db key))
         has-tab?     (contains? tab-roots key)
         {:keys [description url jar-size licenses]} (pom/pom-metadata key version)]
-    [:div {:class "absolute right-0 top-0 h-full w-80 bg-white border-l border-slate-200
-                   shadow-lg z-10 flex flex-col overflow-hidden"}
-     ;; Header with close button
+    [:div {:class "w-80 shrink-0 bg-white border-l border-slate-200
+                   flex flex-col overflow-hidden"}
+     ;; Header
      [:div {:class "flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0"}
-      [:h3 {:class "font-semibold text-sm text-slate-700"} "Properties"]
-      [:button {:class "btn btn-sm btn-circle btn-ghost"
-                :data-on:click (h/action (toggle-properties! cursor))}
-       "✕"]]
+      [:h3 {:class "font-semibold text-sm text-slate-700"} "Properties"]]
      ;; Scrollable content
      [:div {:class "px-4 py-3 space-y-4 overflow-y-auto flex-1 min-h-0"}
       ;; Full artifact name — no truncation
@@ -607,18 +601,6 @@
          (for [tab (rest tabs)]
            (render-tab cursor tab (= (:id tab) active-id)))])]
 
-     ;; Properties panel toggle
-     [:button.btn.btn-square.btn-sm.tooltip.tooltip-bottom
-      {:data-accel "i"
-       :data-preserve-attr "data-tip"
-       :class (when (:show-properties? state) "btn-active")
-       :data-on:click (h/action (toggle-properties! cursor))}
-      ;; Info icon (SVG) — circled "i"
-      [:svg {:class "w-5 h-5" :viewBox "0 0 20 20" :fill "currentColor"
-             :xmlns "http://www.w3.org/2000/svg"}
-       [:path {:fill-rule "evenodd" :clip-rule "evenodd"
-               :d "M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z"}]]]
-
      ;; Artifact search
      (let [search (h/tab-cursor :search "")]
        [:div.relative.shrink-0
@@ -671,7 +653,7 @@
         state @cursor
         view (active-view state)
         {:keys [selected left-offset right-offset]} view
-        {:keys [hidden-libs max-visible show-properties?]} state
+        {:keys [hidden-libs max-visible]} state
         tab-roots (tab-root-set state)
         ;; Defer layout computation until the client has reported viewport
         ;; dimensions (max-visible). The dep-viewer container must always
@@ -686,43 +668,46 @@
      ;; Toolbar with nav buttons, tabs, and search
      (render-toolbar cursor db)
 
-     ;; Content area fills remaining space, centers the graph.
-     ;; data-draw-arrows passes connection JSON to the client-side arrow plugin.
-     [:div (cond-> {:id "dep-viewer"
-                    :class "flex-1 min-h-0 relative flex justify-center gap-[120px] overflow-auto"
-                    :data-track-height "true"
-                    :data-on:change__debounce.300ms
-                    (h/action
-                     (when-let [mv (some-> $value not-empty parse-long)]
-                       (when (and (pos? mv) (not= mv (:max-visible @cursor)))
-                         (swap! cursor assoc :max-visible mv))))}
-             layout-data
-             (assoc :data-draw-arrows (connections->json (:connections layout-data)
-                                                         (:id (:selected-box layout-data)))))
+     ;; Content area fills remaining space; dep-viewer and properties panel sit side by side.
+     [:div {:class "flex-1 min-h-0 flex"}
 
+      ;; Dependency graph — fills available width next to properties panel.
+      ;; data-draw-arrows passes connection JSON to the client-side arrow plugin.
+      [:div (cond-> {:id "dep-viewer"
+                     :class "flex-1 min-w-0 relative flex justify-center gap-[120px] overflow-auto"
+                     :data-track-height "true"
+                     :data-on:change__debounce.300ms
+                     (h/action
+                      (when-let [mv (some-> $value not-empty parse-long)]
+                        (when (and (pos? mv) (not= mv (:max-visible @cursor)))
+                          (swap! cursor assoc :max-visible mv))))}
+              layout-data
+              (assoc :data-draw-arrows (connections->json (:connections layout-data)
+                                                          (:id (:selected-box layout-data)))))
+
+       (when layout-data
+         (list
+          ;; Empty SVG container — client-side JS populates arrow paths
+          [:svg {:id "arrow-overlay"
+                 :class "absolute inset-0 pointer-events-none"
+                 :width "100%"
+                 :height "100%"
+                 :xmlns "http://www.w3.org/2000/svg"
+                 :data-ignore-morph true}]
+
+          ;; Left column: dependants
+          (render-column (:left layout-data) :left selected cursor db)
+
+          ;; Center: selected artifact
+          [:div {:class "relative flex flex-col justify-center w-[280px] h-full"}
+           (render-box (:selected-box layout-data) true (h/action))]
+
+          ;; Right column: dependencies
+          (render-column (:right layout-data) :right selected cursor db)))]
+
+      ;; Properties panel — fixed-width sidebar on the right
       (when layout-data
-        (list
-         ;; Empty SVG container — client-side JS populates arrow paths
-         [:svg {:id "arrow-overlay"
-                :class "absolute inset-0 pointer-events-none"
-                :width "100%"
-                :height "100%"
-                :xmlns "http://www.w3.org/2000/svg"
-                :data-ignore-morph true}]
-
-         ;; Left column: dependants
-         (render-column (:left layout-data) :left selected cursor db)
-
-         ;; Center: selected artifact
-         [:div {:class "relative flex flex-col justify-center w-[280px] h-full"}
-          (render-box (:selected-box layout-data) true (h/action))]
-
-         ;; Right column: dependencies
-         (render-column (:right layout-data) :right selected cursor db)
-
-         ;; Properties panel overlay (when toggled on)
-         (when show-properties?
-           (render-properties-panel cursor db (:selected-box layout-data) tab-roots hidden-libs))))]
+        (render-properties-panel cursor db (:selected-box layout-data) tab-roots hidden-libs))]
 
      ;; Footer with summary statistics and optional category popup
      (render-footer cursor db)
