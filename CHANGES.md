@@ -1,3 +1,5 @@
+# 0.1 -- UNRELEASED
+
 # 0.1-beta-1
 
 - Properties panel is now always visible as a fixed-width sidebar
