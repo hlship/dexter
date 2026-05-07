@@ -179,27 +179,37 @@
 (defn summary-stats
   "Computes summary statistics for the entire dependency database.
 
+  Dependencies whose target is in `hidden-libs` are excluded from all counts.
+
   Returns a map with:
-  - :artifact-count  - total number of artifacts (excluding ROOT)
+  - :artifact-count  - total number of visible artifacts (excluding ROOT and hidden-libs)
   - :dep-count       - total number of dependency relationships
-  - :compatible      - count of compatible (but not exact) version matches
-  - :incompatible    - count of incompatible version matches
-  - :unknown         - count of unknown version matches (git SHA, etc.)"
-  [db]
-  (let [all-keys (remove #{'ROOT} (deps/artifact-keys db))
-        counts (reduce
-                (fn [acc artifact-key]
-                  (reduce
-                   (fn [acc {:keys [requested-version resolved-version]}]
-                     (let [m (version-match requested-version resolved-version)]
-                       (-> acc
-                           (update :dep-count inc)
-                           (update m (fnil inc 0)))))
-                   acc
-                   (deps/dependencies db artifact-key)))
-                {:dep-count 0}
-                (cons 'ROOT all-keys))]
-    (assoc counts :artifact-count (count all-keys))))
+  - :compatible      - count of unique artifacts with compatible (but not exact) version matches
+  - :incompatible    - count of unique artifacts with incompatible version matches
+  - :unknown         - count of unique artifacts with unknown version matches (git SHA, etc.)"
+  [db hidden-libs]
+  (let [all-keys (remove #(or (= 'ROOT %) (contains? hidden-libs %))
+                         (deps/artifact-keys db))
+        {:keys [dep-count] :as counts}
+        (reduce
+         (fn [acc artifact-key]
+           (reduce
+            (fn [acc {:keys [to requested-version resolved-version]}]
+              (if (contains? hidden-libs to)
+                acc
+                (let [m (version-match requested-version resolved-version)]
+                  (-> acc
+                      (update :dep-count inc)
+                      (update m (fnil conj #{}) to)))))
+            acc
+            (deps/dependencies db artifact-key)))
+         {:dep-count 0}
+         (cons 'ROOT all-keys))]
+    {:artifact-count (count all-keys)
+     :dep-count dep-count
+     :compatible (count (:compatible counts))
+     :incompatible (count (:incompatible counts))
+     :unknown (count (:unknown counts))}))
 
 (defn artifacts-by-match
   "Returns artifacts grouped by version-match category.
@@ -207,21 +217,24 @@
   Iterates all dependency relationships and classifies each by version-match.
   Collects the *dependency target* artifact for each non-exact match into
   category sets. An artifact may appear in multiple categories.
+  Dependencies whose target is in `hidden-libs` are excluded.
 
   Returns a map of:
   - :compatible    - sorted vec of {:key artifact-key :label string}
   - :incompatible  - sorted vec of {:key artifact-key :label string}
   - :unknown       - sorted vec of {:key artifact-key :label string}"
-  [db]
+  [db hidden-libs]
   (let [;; Accumulate sets of artifact keys per category
         by-cat (reduce
                 (fn [acc artifact-key]
                   (reduce
                    (fn [acc {:keys [to requested-version resolved-version]}]
-                     (let [m (version-match requested-version resolved-version)]
-                       (if (= :exact m)
-                         acc
-                         (update acc m (fnil conj #{}) to))))
+                     (if (contains? hidden-libs to)
+                       acc
+                       (let [m (version-match requested-version resolved-version)]
+                         (if (= :exact m)
+                           acc
+                           (update acc m (fnil conj #{}) to)))))
                    acc
                    (deps/dependencies db artifact-key)))
                 {}

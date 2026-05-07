@@ -252,11 +252,11 @@
   "Renders a modal popup listing artifacts for a version-match category.
   Includes a search field to filter the list and clickable artifact names
   that navigate to the artifact and close the popup."
-  [cursor db category]
+  [cursor db hidden-libs category]
   (let [{:keys [title badge-class]} (category-config category)
         search (h/tab-cursor :footer-search "")
         search-text (string/lower-case (str @search))
-        all-artifacts (get (layout/artifacts-by-match db) category)
+        all-artifacts (get (layout/artifacts-by-match db hidden-libs) category)
         artifacts (if (seq search-text)
                     (filterv #(string/includes?
                                (string/lower-case (:label %))
@@ -356,9 +356,9 @@
   "Renders a footer bar with summary statistics about the dependency graph.
   The colored indicators are clickable and open a popup listing the matching
   artifacts."
-  [cursor db]
+  [cursor db hidden-libs]
   (let [{:keys [artifact-count dep-count compatible incompatible unknown]}
-        (layout/summary-stats db)
+        (layout/summary-stats db hidden-libs)
         summary (str artifact-count " artifacts; " dep-count " dependencies")
         popup-cat (:footer-popup @cursor)
         parts (cond-> []
@@ -379,7 +379,7 @@
           [:span " · " part]))]
      ;; Render popup when a category is selected
      (when popup-cat
-       (render-footer-popup cursor db popup-cat)))))
+       (render-footer-popup cursor db hidden-libs popup-cat)))))
 
 ;; --- Properties Panel ---
 
@@ -710,7 +710,7 @@
         (render-properties-panel cursor db (:selected-box layout-data) tab-roots hidden-libs))]
 
      ;; Footer with summary statistics and optional category popup
-     (render-footer cursor db)
+     (render-footer cursor db hidden-libs)
 
      ;; Disconnect modal — invisible by default, revealed by client-side JS.
      ;; data-ignore-morph prevents Datastar's DOM morph from reverting the

@@ -39,12 +39,19 @@
   - :dependants    - reverse index {key -> [{:from key :requested-version v}]}
   - :by-label      - {lowercase-label -> key} for search"
   [raw-data]
-  (let [;; Ensure every artifact has a :label, and sort :deps alphabetically
+  (let [;; Ensure every artifact has a :label, and sort :deps alphabetically.
+        ;; Filter out deps that reference unresolved artifacts — these are
+        ;; version-evicted transitive dependencies that appear in the trace
+        ;; tree but were never included in the resolved set.
         artifacts (reduce-kv
                    (fn [m k info]
                      (assoc m k (-> info
                                     (update :label #(or % (str k)))
-                                    (update :deps #(when (seq %) (into (sorted-map) %))))))
+                                    (update :deps (fn [deps]
+                                                    (when (seq deps)
+                                                      (into (sorted-map)
+                                                            (filter #(contains? raw-data (key %)))
+                                                            deps)))))))
                    {}
                    raw-data)
         ;; Build label index: lowercase label -> artifact key
