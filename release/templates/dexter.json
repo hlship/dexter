@@ -3,7 +3,9 @@
     "description": "Interactive dependency explorer for Clojure and JVM projects",
     "homepage": "https://github.com/hlship/dexter",
     "license": "Apache-2.0",
-    "depends": "java",
+    "suggest": {
+        "JDK": ["java/temurin-lts-jdk"]
+    },
     "url": "https://github.com/hlship/dexter/releases/download/{{tag}}/{{zip-name}}",
     "hash": "{{sha}}",
     "extract_dir": "",
