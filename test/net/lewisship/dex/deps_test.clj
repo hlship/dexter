@@ -37,6 +37,22 @@
     (let [dept-keys (mapv :from (deps/dependants db 'alpha/dep))]
       (is (= ['zebra/lib] dept-keys)))))
 
+(deftest unresolved-deps-are-filtered
+  (testing "deps referencing artifacts not in raw-data are excluded from the db"
+    (let [raw {'ROOT {:version "1.0.0"
+                      :label "proj"
+                      :deps {'real/lib {:version "1.0"}
+                             'phantom/lib {:version "2.0"}}}
+               'real/lib {:version "1.0"
+                          :deps {'phantom/lib {:version "2.0"}}}}
+          db (deps/build-db raw)]
+      (is (= ['real/lib] (mapv :to (deps/dependencies db 'ROOT)))
+          "phantom/lib should be filtered from ROOT deps")
+      (is (= [] (deps/dependencies db 'real/lib))
+          "phantom/lib should be filtered from real/lib deps")
+      (is (nil? (deps/artifact-info db 'phantom/lib))
+          "phantom/lib should not appear in artifacts"))))
+
 (deftest labels-are-guaranteed
   (testing "explicit label is preserved"
     (is (= "test-project" (:label (deps/artifact-info db 'ROOT)))))

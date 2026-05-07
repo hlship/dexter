@@ -15,7 +15,9 @@
                        "clj-kondo --copy-configs --dependencies --lint"
                        (-> (p/shell {:out :string} "clojure -A:dev:test -Spath") :out string/trim))
               ;; Second pass: lint project sources using cached dependency info
-              (p/shell "clj-kondo --lint src test dev"))
+              (let [{:keys [exit]} (p/shell {:continue true} "clj-kondo --lint src test dev")]
+                (when-not (zero? exit)
+                  (System/exit exit))))
   tailwind  (p/shell "tailwindcss -i public/style.css -o generated-resources/public/style.css --watch")
   package   (r/package "test")
   release   (let [tag (sh {:out :string} "git describe --tags --abbrev=0")
