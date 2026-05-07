@@ -42,7 +42,7 @@ scoop bucket add hlship https://github.com/hlship/scoop-bucket
 scoop install dexter
 ```
 
-### Linux, Windows (manual)
+### Linux
 
 Download Dexter from [GitHub Releases](https://github.com/hlship/dexter/releases)
 and unpack the distribution, which includes launcher scripts (`dexter` for
@@ -94,13 +94,9 @@ dexter -p 8080 -O
 
 Click any artifact to make it the new selection. The display animates to show its dependants and dependencies.
 
-### Property Panel 
- 
-Click the  icon (or type `⌘I`) to open a property panel for the selected dependency (in the center):
+### Properties Panel
 
-![Property Panel](docs/images/property-panel.png)
-
-The property panel floats above the main user interface.
+The properties panel is on the right side of the display, and shows more detailed information about the selected artifact in the center.
 
 The exact information displayed will vary dependending on what information is available in the Maven POM file for
 the dependency (if it even exists).
@@ -111,7 +107,6 @@ the dependency (if it even exists).
 
 Dexter supports multiple tabs, each providing an independent view into the dependency tree.
 
-<!-- TODO: add screenshot showing multiple tabs -->
 ![Tabs](docs/images/tabs.png)
 
 - The **ROOT tab** is always present and cannot be closed; it shows the full project dependency tree
@@ -124,12 +119,12 @@ Dexter supports multiple tabs, each providing an independent view into the depen
 
 Arrows represent dependency relationships. Their color indicates whether the version requested by the parent matches the version actually resolved:
 
-| Color | Meaning |
-|---|---|
-| **Black** | Exact match — requested version equals resolved version |
-| **Green** | Compatible — same major version (or same major.minor for 0.x) |
-| **Red** | Incompatible — different major version |
-| **Yellow** | Unknown — involves a git SHA, local path, or unparseable version |
+| Color       | Meaning                                                       |
+|-------------|---------------------------------------------------------------|
+| **Black**   | Exact match — requested version equals resolved version       |
+| **Green**   | Compatible — same major version (or same major.minor for 0.x) |
+| **Red**     | Incompatible — different major version                        |
+| **Yellow**  | Unparseable version, or a Git coordinate, or a local root     |
 
 Hover over any arrow to highlight it and see the requested version.
 
