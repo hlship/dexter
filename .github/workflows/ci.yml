@@ -57,6 +57,8 @@ jobs:
         run: |
           Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
           Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+          # Make scoop and installed shims available to subsequent steps
+          Join-Path $env:USERPROFILE "scoop\shims" | Out-File -Append $env:GITHUB_PATH
 
       - name: Install Java
         shell: pwsh
