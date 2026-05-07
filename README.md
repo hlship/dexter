@@ -38,6 +38,8 @@ Install with `brew install hlship/brew/dexter`.
 Install with [Scoop](https://scoop.sh/):
 
 ```
+scoop bucket add java
+scoop install java/temurin-lts-jdk
 scoop bucket add hlship https://github.com/hlship/scoop-bucket
 scoop install dexter
 ```
