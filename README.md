@@ -13,6 +13,7 @@ Mousing over a dependency arrow expands it and, for non-exact matches, displays 
 - **Three-column explorer** — select an artifact to see its dependants (left), the artifact itself (center), and its dependencies (right)
 - **Multiple tabs** — open independent views into different parts of the dependency tree; each tab has its own navigation history
 - **Version mismatch detection** — arrows and box borders are color-coded by compatibility: black (exact match), green (compatible), red (incompatible), yellow (unknown/git SHA)
+- **Properties panel** — always-visible sidebar showing artifact details, Maven metadata, and dependency/dependant breakdowns by version compatibility
 - **Keyboard navigation** — `⌘F`/`Ctrl+F` to search, `⌘H`/`Ctrl+H` home, `⌘B`/`Ctrl+B` back, `⌘1`/`⌘2`/`⌘3` to browse compatible/incompatible/unknown dependencies
 - **Animated transitions** — boxes animate smoothly when navigating; arrows fade out and redraw
 - **Dynamic layout** — columns resize automatically to fill the viewport
@@ -38,6 +39,8 @@ Install with `brew install hlship/brew/dexter`.
 Install with [Scoop](https://scoop.sh/):
 
 ```
+scoop bucket add java
+scoop install java/temurin-lts-jdk
 scoop bucket add hlship https://github.com/hlship/scoop-bucket
 scoop install dexter
 ```
@@ -96,9 +99,10 @@ Click any artifact to make it the new selection. The display animates to show it
 
 ### Properties Panel
 
-The properties panel is on the right side of the display, and shows more detailed information about the selected artifact in the center.
+The properties panel is always visible on the right side of the display, showing detailed information about the selected artifact: Maven coordinates, version, JAR size, description, licenses, and links.
+It also breaks down the artifact's dependencies and dependants by version-match category.
 
-The exact information displayed will vary dependending on what information is available in the Maven POM file for
+The exact information displayed will vary depending on what information is available in the Maven POM file for
 the dependency (if it even exists).
 
 ## Search 

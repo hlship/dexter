@@ -57,6 +57,17 @@ Special key `'ROOT` represents the project itself.
  :footer-popup nil}                                              ; :compatible, :incompatible, :unknown, or nil
 ```
 
+**Main content layout:**
+```
+h-screen flex-col
+├── toolbar
+├── flex-1 min-h-0 flex              ← content wrapper (horizontal flex)
+│   ├── #dep-viewer (flex-1 min-w-0) ← graph area, takes remaining width
+│   └── properties panel (w-80 shrink-0) ← fixed 320px sidebar
+├── footer
+└── disconnect modal
+```
+
 **Layout** (output of `layout/compute-layout`):
 ```clojure
 {:selected-box box-descriptor
@@ -79,7 +90,9 @@ Special key `'ROOT` represents the project itself.
 - **SVG arrows:** Drawn client-side via `data-draw-arrows` plugin. Connection data (including version-match colors) is serialized to JSON by the server.
 - **FLIP animation:** Box transitions use the Web Animations API. The `data-draw-arrows` plugin's `apply()` callback serves as the morph signal — no MutationObserver needed.
 - **Version compatibility:** Classified by `layout/version-match` using `version-clj`: exact (black), compatible (green), incompatible (red), unknown/git-sha (yellow).
-- **Footer category popups:** The footer's colored indicators (compatible/incompatible/unknown) are clickable. Clicking one sets `:footer-popup` in the view cursor, which triggers a server-rendered DaisyUI modal listing all artifacts in that category (via `layout/artifacts-by-match`). The popup includes a search/filter field (when >8 items), scrollable list, and closes on backdrop click, ✕ button, or Escape key. Clicking an artifact navigates to it and closes the popup.
+- **Footer category popups:** The footer's colored indicators (compatible/incompatible/unknown) are clickable. Clicking one sets `:footer-popup` in the view cursor, which triggers a server-rendered DaisyUI modal listing all artifacts in that category (via `layout/artifacts-by-match`). The popup includes a search/filter field (when >8 items), scrollable list, and closes on backdrop click, ✕ button, or Escape key. Clicking an artifact navigates to it and closes the popup. Both `summary-stats` and `artifacts-by-match` accept `hidden-libs` and count unique artifacts (not dependency edges) so footer numbers match popup counts.
+- **Properties panel:** Always visible as a fixed-width sidebar (320px) on the right side of the content area. The dep-viewer and properties panel sit side by side in a flex container — the dep-viewer gets `flex-1 min-w-0` and the panel gets `w-80 shrink-0`. This ensures the graph centers within the available space, not the full viewport.
+- **Unresolved dependencies:** `build-db` filters out dependency edges whose target is not in the raw data (version-evicted transitive dependencies that appear in the trace tree but were never resolved). This prevents phantom artifacts from appearing in counts or navigation.
 - **Server disconnect modal:** A DaisyUI modal (`#disconnect-modal` inside `#modal-container`) is rendered hidden in the page by `home-page`. The container has `data-ignore-morph` so Datastar's DOM morph won't revert JS changes. Client-side JS listens for `datastar-fetch` custom events; on `"retrying"` or `"retries-failed"` it adds `modal-open` to show "You may close this window now."
 - **Modal suppression:** The `data-accel` plugin checks `.modal.modal-open` to suppress keyboard shortcuts when any modal is visible (both server-rendered popups and client-side modals).
 
