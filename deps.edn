@@ -4,12 +4,12 @@
  :deps
  {org.clojure/clojure                          {:mvn/version "1.12.4"}
   org.clojure/tools.deps                       {:mvn/version "0.29.1598"}
-  io.github.hlship/cli-tools                   {:mvn/version "0.16.0-beta-5"}
+  io.github.hlship/cli-tools                   {:mvn/version "0.16.0-beta-6"}
   babashka/process                             {:mvn/version "0.6.25"}
   babashka/fs                                  {:mvn/version "0.5.33"}
   org.clj-commons/humanize                     {:mvn/version "1.2"}
   dynamic-alpha/hyper                          {:git/url "https://github.com/dynamic-alpha/hyper"
-                                                :git/sha "3532d3d5e0fc4755d781618e7cb9fd200f930c42"}
+                                                :git/sha "3ead994e36930d4b42e1ce579db819383794834a"}
   ;; hyper depends on brotli4j, which uses Maven profiles to pull in native
   ;; libraries for the *build* machine's OS/arch only. Explicitly include
   ;; all target platforms so the uberjar works everywhere.
