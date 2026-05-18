@@ -51,7 +51,7 @@
   (loop [h nav-history]
     (when (seq h)
       (let [entry (peek h)
-            h'    (pop h)]
+            h' (pop h)]
         (if (deps/artifact-info db (:selected entry))
           [entry h']
           (recur h'))))))
@@ -449,8 +449,9 @@
   details for the currently selected artifact: full name, version, and
   dependencies/dependants broken down by version-match category.
   db should be the already-filtered active database.
-  tab-roots is a set of artifact keys that already have open tabs."
-  [cursor db selected-box tab-roots]
+  tab-roots is a set of artifact keys that already have open tabs.
+  hidden-libs is the current tab's set of hidden artifact keys."
+  [cursor db selected-box tab-roots hidden-libs]
   (let [{:keys [key name version]} selected-box
         dependencies (deps/dependencies db key)
         dependants (deps/dependants db key)
@@ -528,8 +529,9 @@
                 :target "_blank"
                 :rel "noopener noreferrer"}
             "mvnrepository.com"]]))
-      ;; Open in new tab button
-      [:div
+      ;; Action buttons row
+      [:div {:class "flex gap-2"}
+       ;; Open in new tab
        [:button {:class (str "btn btn-sm btn-outline gap-1 "
                              (when has-tab? "btn-disabled"))
                  :disabled has-tab?
@@ -539,7 +541,35 @@
                :stroke "currentColor" :stroke-width "1.5" :stroke-linecap "round"
                :xmlns "http://www.w3.org/2000/svg"}
          [:path {:d "M6 2v8M2 6h8"}]]
-        "Open in new tab"]]
+        "Open in new tab"]
+       ;; Hide/Show button — not shown for ROOT
+       (when (not= key 'ROOT)
+         (let [is-hidden? (contains? hidden-libs key)]
+           [:button {:class "btn btn-sm btn-outline gap-1"
+                     :data-on:click
+                     (h/action
+                      (swap! cursor update-active-view
+                             (fn [{:keys [hidden-libs] :as view}]
+                               (assoc view
+                                      :hidden-libs (if (contains? hidden-libs key)
+                                                     (disj hidden-libs key)
+                                                     (conj hidden-libs key))
+                                      :db nil))))}
+            (if is-hidden?
+              ;; Eye icon — show / unhide
+              (list [:svg {:class "w-4 h-4" :viewBox "0 0 20 20" :fill "currentColor"
+                           :xmlns "http://www.w3.org/2000/svg"}
+                     [:path {:d "M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z"}]
+                     [:path {:fill-rule "evenodd" :clip-rule "evenodd"
+                             :d "M.664 10.59a1.651 1.651 0 010-1.186A10.004 10.004 0 0110 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0110 17c-4.257 0-7.893-2.66-9.336-6.41z"}]]
+                    "Show")
+              ;; Eye-slash icon — hide
+              (list [:svg {:class "w-4 h-4" :viewBox "0 0 20 20" :fill "currentColor"
+                           :xmlns "http://www.w3.org/2000/svg"}
+                     [:path {:fill-rule "evenodd" :clip-rule "evenodd"
+                             :d "M3.28 2.22a.75.75 0 00-1.06 1.06l14.5 14.5a.75.75 0 101.06-1.06l-1.745-1.745a10.029 10.029 0 003.3-4.38 1.651 1.651 0 000-1.185A10.004 10.004 0 009.999 3a9.956 9.956 0 00-4.744 1.194L3.28 2.22zM7.752 6.69l1.092 1.092a2.5 2.5 0 013.374 3.373l1.091 1.092a4 4 0 00-5.557-5.557z"}]
+                     [:path {:d "M10.748 13.93l2.523 2.523a9.987 9.987 0 01-3.27.547c-4.258 0-7.512-2.687-8.777-6.061a1.651 1.651 0 010-1.184A9.95 9.95 0 015.748 5.37L7.133 6.755c-.346.069-.679.171-.99.302a2.5 2.5 0 01-.663 3.469 2.5 2.5 0 012.5 2.5c0 .173-.017.342-.05.506l1.818 1.818z"}]]
+                    "Hide"))]))]
       ;; Dependencies section
       [:div
        [:div {:class "text-xs font-medium text-slate-400 uppercase tracking-wide mb-2"}
@@ -697,12 +727,8 @@
                  :data-on:change
                  (h/action
                   (swap! cursor update-active-view
-                         (fn [{:keys [hidden-libs show-hidden? db] :as view}]
-                           (let [new-show-hidden? (not show-hidden?)]
-                             (assoc view
-                                    :show-hidden? new-show-hidden?
-                                    :db (deps/filter-db (:dependency-data db)
-                                                        (if new-show-hidden? #{} hidden-libs)))))))}]]
+                         (fn [{:keys [show-hidden?] :as view}]
+                           (assoc view :show-hidden? (not show-hidden?) :db nil))))}]]
        ;; Fade exact connections — purely client-side signal
        [:label {:class "label cursor-pointer gap-3 px-1 py-2 rounded hover:bg-base-200"}
         [:span {:class "label-text text-sm"} "Fade Exact Connections"]
@@ -745,18 +771,18 @@
                      (fn [view]
                        (if-let [[entry trimmed] (last-visible-in-history nav-history db)]
                          (assoc view
-                                :selected     (:selected entry)
-                                :left-offset  (:left-offset entry)
+                                :selected (:selected entry)
+                                :left-offset (:left-offset entry)
                                 :right-offset (:right-offset entry)
-                                :nav-history  trimmed)
+                                :nav-history trimmed)
                          (assoc view
-                                :selected     'ROOT
-                                :left-offset  0
+                                :selected 'ROOT
+                                :left-offset 0
                                 :right-offset 0
-                                :nav-history  []))))))
+                                :nav-history []))))))
         state @view-cursor
         view (active-view state)
-        {:keys [selected left-offset right-offset]
+        {:keys [selected left-offset right-offset hidden-libs]
          active-db :db} view
         {:keys [max-visible]} state
         tab-roots (tab-root-set state)
@@ -813,7 +839,7 @@
 
       ;; Properties panel — fixed-width sidebar on the right
       (when layout-data
-        (render-properties-panel view-cursor active-db (:selected-box layout-data) tab-roots))]
+        (render-properties-panel view-cursor active-db (:selected-box layout-data) tab-roots hidden-libs))]
 
      ;; Footer with summary statistics and optional category popup
      (render-footer view-cursor active-db)
