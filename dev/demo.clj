@@ -9,15 +9,14 @@
             [net.lewisship.dex.maven-reader :as maven-reader]
             [net.lewisship.dex.service :as service]))
 
-;; Holds the current raw artifact map for REPL convenience.
-;; Load raw data into this atom, then pass to service/start!.
-(defonce *raw (atom nil))
+;; Holds the current dependency data for REPL convenience.
+;; Load data into this atom, then call start!.
+(defonce *dependency-data (atom nil))
 
 (defn- start!
-  "Starts the service with the current raw data."
+  "Starts the service with the current dependency data."
   []
-  (service/start! {:raw-data @*raw
-                   :db       (deps/build-db @*raw)}))
+  (service/start! {:dependency-data @*dependency-data}))
 
 (comment
 
@@ -28,16 +27,16 @@
   ;; --- Loading data manually ---
 
   ;; Load from pre-built test data
-  (reset! *raw (deps/load-raw "test-resources/dex/project-deps.edn"))
+  (reset! *dependency-data (deps/load-dependency-data "test-resources/dex/project-deps.edn"))
 
   ;; Or resolve live from a deps.edn (this project as an example)
-  (reset! *raw
+  (reset! *dependency-data
           (deps-reader/read-deps (fs/file "deps.edn") {:aliases ["dev" "test"]}))
 
-  (reset! *raw
+  (reset! *dependency-data
           (lein-reader/read-deps (fs/file "../../nubank/balatro/project.clj") nil))
 
-  (reset! *raw
+  (reset! *dependency-data
           (maven-reader/read-deps (fs/file "../spring-petclinic/pom.xml") nil))
 
   ;; --- Server lifecycle ---

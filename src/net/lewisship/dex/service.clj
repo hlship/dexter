@@ -12,14 +12,12 @@
          :get #'views/home-page}]])
 
 (defn- create-handler
-  "Creates the Ring handler, seeding `db` and `raw-data` into Hyper's
-  app-state so they are available on both initial page loads and SSE
-  re-renders. raw-data is the pre-build-db artifact map, used to build
-  filtered databases when the 'show hidden libs' toggle is off."
-  [{:keys [db raw-data]}]
+  "Creates the Ring handler, seeding dependency-data into Hyper's app-state.
+  home-page builds and caches the active db on demand from dependency-data."
+  [dependency-data]
   (h/create-handler
    #'routes
-   :app-state (atom (assoc (state/init-state) :db db :raw-data raw-data))
+   :app-state (atom (assoc (state/init-state) :dependency-data dependency-data))
    :static-resources "public"
    :datastar-script [:script {:type "module"
                               :src "/js/main.js"}]
@@ -31,12 +29,12 @@
 (defonce *app (atom nil))
 
 (defn start!
-  [{:keys [port db raw-data]}]
+  [{:keys [port dependency-data]}]
   (if @*app
     :already-running
     (do
       (reset! *app
-              (h/start! (create-handler {:db db :raw-data raw-data}) {:port (or port 10240)}))
+              (h/start! (create-handler dependency-data) {:port (or port 10240)}))
       :started)))
 
 (defn stop!

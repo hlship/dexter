@@ -42,6 +42,20 @@
 
 ;; --- Navigation History ---
 
+(defn- last-visible-in-history
+  "Searches nav-history from most recent to oldest for an entry whose
+  :selected artifact is present in db. Returns [entry trimmed-history]
+  where trimmed-history contains only entries before the found one, or
+  nil if no visible entry exists."
+  [nav-history db]
+  (loop [h nav-history]
+    (when (seq h)
+      (let [entry (peek h)
+            h'    (pop h)]
+        (if (deps/artifact-info db (:selected entry))
+          [entry h']
+          (recur h'))))))
+
 (defn- navigate!
   "Pushes the current view state onto :nav-history, then navigates to the
   given artifact key with offsets reset to 0. No-op if already viewing
@@ -90,7 +104,9 @@
                                         :left-offset 0
                                         :right-offset 0
                                         :nav-history []
-                                        :hidden-libs (:hidden-libs (active-view state))})
+                                        :hidden-libs (:hidden-libs (active-view state))
+                                        :show-hidden? (:show-hidden? (active-view state))
+                                        :db nil})
                  (assoc :active-tab id)
                  (update :next-id inc)
                  (update :tab-history conj id))))))
@@ -125,13 +141,12 @@
   "Returns a function that adjusts a column offset by `delta` (+1 or -1),
   clamping to [0, total - max-visible].  `column-key` is the layout key
   (:left or :right) used to look up the windowed column data."
-  [raw-data cursor column-key delta]
+  [cursor column-key delta]
   (let [state @cursor
         view (active-view state)
-        {:keys [selected left-offset right-offset hidden-libs]} view
+        {:keys [selected left-offset right-offset db]} view
         {:keys [max-visible]} state
-        active-db   (deps/filter-db raw-data hidden-libs)
-        layout-data (layout/compute-layout active-db selected left-offset right-offset
+        layout-data (layout/compute-layout db selected left-offset right-offset
                                            max-visible)
         {:keys [total]} (get layout-data column-key)
         max-visible (or max-visible layout/default-max-visible)
@@ -186,7 +201,7 @@
 (defn- render-column
   "Renders a column of artifact boxes with optional overflow indicators.
   The column fills its parent's height and vertically centers its boxes."
-  [{:keys [boxes before after]} column selected-key cursor raw-data]
+  [{:keys [boxes before after]} column selected-key cursor]
   (let [offset-key (case column :left :left-offset :right :right-offset)]
     [:div {:class "dep-column relative flex flex-col justify-center gap-3 w-[280px] h-full"
            :data-on:wheel__prevent__throttle.150ms
@@ -195,13 +210,13 @@
               (swap! cursor update-active-view
                      (fn [view]
                        (update view offset-key
-                               (scroll-offset raw-data cursor column delta))))))}
+                               (scroll-offset cursor column delta))))))}
      (render-overflow-indicator
       before :up
       (h/action (swap! cursor update-active-view
                        (fn [view]
                          (update view offset-key
-                                 (scroll-offset raw-data cursor column -1))))))
+                                 (scroll-offset cursor column -1))))))
      (for [box boxes]
        (render-box box (= (:key box) selected-key)
                    (h/action (navigate! cursor (:key box)))))
@@ -210,7 +225,7 @@
       (h/action (swap! cursor update-active-view
                        (fn [view]
                          (update view offset-key
-                                 (scroll-offset raw-data cursor column 1))))))]))
+                                 (scroll-offset cursor column 1))))))]))
 
 ;; --- Connection Data ---
 
@@ -438,7 +453,7 @@
   [cursor db selected-box tab-roots]
   (let [{:keys [key name version]} selected-box
         dependencies (deps/dependencies db key)
-        dependants   (deps/dependants db key)
+        dependants (deps/dependants db key)
         has-tab? (contains? tab-roots key)
         {:keys [description url jar-size licenses]} (pom/pom-metadata key version)]
     [:div {:class "w-80 shrink-0 bg-white border-l border-slate-200
@@ -650,22 +665,20 @@
   "Renders a floating action button in the bottom-right corner that opens a
   settings menu with display option toggles.
 
-  'View Hidden' is a per-tab server-side toggle: it swaps the active view's
-  :hidden-libs between the default set and #{} (empty set), triggering a
-  server re-render with the full or filtered dependency graph. When turning
-  hidden-libs back on, if the currently selected artifact would no longer be
-  visible it is reset to ROOT to avoid a null pointer on re-render.
+  'View Hidden' is a per-tab server-side toggle. Flipping it rebuilds the
+  active db immediately (cached in view state) and resets navigation to ROOT
+  if the currently selected artifact would no longer be visible.
 
   'Fade Exact Connections' is a client-side toggle bound to a Datastar signal
   that adds a CSS class to dim exact-match arrows — no server round-trip."
-  [cursor hidden-libs raw-data]
-  (let [showing-hidden? (empty? hidden-libs)]
+  [cursor]
+  (let [show-hidden? (:show-hidden? (active-view @cursor))]
     [:div {:class "fixed bottom-6 right-6 z-30"}
      [:div {:class "dropdown dropdown-top dropdown-end"}
       [:div {:tabindex "0"
              :role "button"
              :class "btn btn-circle btn-primary shadow-lg"}
-       ;; Settings gear icon
+     ;; Settings gear icon
        [:svg {:class "w-5 h-5" :viewBox "0 0 20 20" :fill "currentColor"
               :xmlns "http://www.w3.org/2000/svg"}
         [:path {:fill-rule "evenodd" :clip-rule "evenodd"
@@ -674,30 +687,22 @@
              :class "dropdown-content z-[1] menu mb-2 p-3 shadow-lg bg-base-100 rounded-box w-64 border border-base-300"}
        [:div {:class "text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 px-1"}
         "Display Options"]
-       ;; View Hidden — server-side toggle, per-tab
+     ;; View Hidden — server-side toggle, per-tab.
+     ;; Reads :dependency-data from the cached view db so no extra arg needed.
        [:label {:class "label cursor-pointer gap-3 px-1 py-2 rounded hover:bg-base-200"}
         [:span {:class "label-text text-sm"} "View Hidden"]
         [:input {:type "checkbox"
                  :class "toggle toggle-primary toggle-sm"
-                 :checked showing-hidden?
+                 :checked show-hidden?
                  :data-on:change
                  (h/action
                   (swap! cursor update-active-view
-                         (fn [view]
-                           (let [new-hidden-libs (if (seq (:hidden-libs view))
-                                                   #{}
-                                                   layout/default-hidden-libs)
-                                 ;; If the selected artifact won't exist in the
-                                 ;; filtered db, reset to ROOT before re-render.
-                                 selected-visible? (deps/artifact-info
-                                                    (deps/filter-db raw-data new-hidden-libs)
-                                                    (:selected view))]
-                             (cond-> (assoc view :hidden-libs new-hidden-libs)
-                               (not selected-visible?)
-                               (assoc :selected 'ROOT
-                                      :left-offset 0
-                                      :right-offset 0
-                                      :nav-history []))))))}]]
+                         (fn [{:keys [hidden-libs show-hidden? db] :as view}]
+                           (let [new-show-hidden? (not show-hidden?)]
+                             (assoc view
+                                    :show-hidden? new-show-hidden?
+                                    :db (deps/filter-db (:dependency-data db)
+                                                        (if new-show-hidden? #{} hidden-libs)))))))}]]
        ;; Fade exact connections — purely client-side signal
        [:label {:class "label cursor-pointer gap-3 px-1 py-2 rounded hover:bg-base-200"}
         [:span {:class "label-text text-sm"} "Fade Exact Connections"]
@@ -706,29 +711,54 @@
                  :data-bind "fadeExactConnections"}]]]]]))
 
 (defn home-page [req]
-  (let [{:keys [db raw-data]} @(:hyper/app-state req)
-        root-label (:label (deps/artifact-info db 'ROOT))
-        cursor (h/tab-cursor :view
-                             {:tabs [{:id 0 :root 'ROOT :label root-label}]
-                              :active-tab 0
-                              :next-id 1
-                              :tab-history [0]
-                              :views {0 {:selected 'ROOT
-                                         :left-offset 0
-                                         :right-offset 0
-                                         :nav-history []
-                                         :hidden-libs layout/default-hidden-libs}}
-                              :max-visible nil
-                              :footer-popup nil})
-        state @cursor
+  (let [dependency-data (:dependency-data @(:hyper/app-state req))
+        root-label (or (get-in dependency-data ['ROOT :label]) "ROOT")
+        view-cursor (h/tab-cursor :view
+                                  {:tabs [{:id 0 :root 'ROOT :label root-label}]
+                                   :active-tab 0
+                                   :next-id 1
+                                   :tab-history [0]
+                                   :views {0 {:selected 'ROOT
+                                              :left-offset 0
+                                              :right-offset 0
+                                              :nav-history []
+                                              :hidden-libs layout/default-hidden-libs
+                                              :show-hidden? false
+                                              :db nil}}
+                                   :max-visible nil
+                                   :footer-popup nil})
+        ;; Build the active db on first render of a tab (or new tab): :db starts as nil.
+        ;; The toggle action builds eagerly to avoid a double-render and broken animation.
+        _ (when (nil? (:db (active-view @view-cursor)))
+            (swap! view-cursor update-active-view
+                   (fn [{:keys [hidden-libs show-hidden?] :as view}]
+                     (assoc view :db (deps/filter-db dependency-data
+                                                     (if show-hidden? #{} hidden-libs))))))
+        ;; Safety net: if the selected artifact is not in the current db (e.g. a hidden
+        ;; lib was selected when View Hidden was turned off), walk nav-history backwards
+        ;; to restore the most recent visible artifact. Falls back to ROOT if none found.
+        ;; Only fires in that rare case; the extra render is acceptable since there is no
+        ;; animation to preserve when the selected box has disappeared.
+        _ (let [{:keys [db selected nav-history]} (active-view @view-cursor)]
+            (when (not (deps/artifact-info db selected))
+              (swap! view-cursor update-active-view
+                     (fn [view]
+                       (if-let [[entry trimmed] (last-visible-in-history nav-history db)]
+                         (assoc view
+                                :selected     (:selected entry)
+                                :left-offset  (:left-offset entry)
+                                :right-offset (:right-offset entry)
+                                :nav-history  trimmed)
+                         (assoc view
+                                :selected     'ROOT
+                                :left-offset  0
+                                :right-offset 0
+                                :nav-history  []))))))
+        state @view-cursor
         view (active-view state)
-        {:keys [selected left-offset right-offset hidden-libs]} view
+        {:keys [selected left-offset right-offset]
+         active-db :db} view
         {:keys [max-visible]} state
-        ;; Build the active db: if hidden-libs is non-empty, walk raw-data from
-        ;; ROOT excluding hidden libs (and anything only reachable through them),
-        ;; then rebuild all indexes. The raw hidden-libs value is kept for the
-        ;; FAB toggle so the checkbox reflects the user's explicit choice.
-        active-db (deps/filter-db raw-data hidden-libs)
         tab-roots (tab-root-set state)
         ;; Defer layout computation until the client has reported viewport
         ;; dimensions (max-visible). The dep-viewer container must always
@@ -741,7 +771,7 @@
     ;; Full-viewport flex column: toolbar on top, content fills the rest
     [:div {:class "h-screen flex flex-col bg-slate-100"}
      ;; Toolbar with nav buttons, tabs, and search
-     (render-toolbar cursor db)
+     (render-toolbar view-cursor active-db)
 
      ;; Content area fills remaining space; dep-viewer and properties panel sit side by side.
      [:div {:class "flex-1 min-h-0 flex"}
@@ -755,8 +785,8 @@
                      :data-on:change__debounce.300ms
                      (h/action
                       (when-let [mv (some-> $value not-empty parse-long)]
-                        (when (and (pos? mv) (not= mv (:max-visible @cursor)))
-                          (swap! cursor assoc :max-visible mv))))}
+                        (when (and (pos? mv) (not= mv (:max-visible @view-cursor)))
+                          (swap! view-cursor assoc :max-visible mv))))}
               layout-data
               (assoc :data-draw-arrows (connections->json (:connections layout-data)
                                                           (:id (:selected-box layout-data)))))
@@ -772,24 +802,24 @@
                  :data-ignore-morph true}]
 
           ;; Left column: dependants
-          (render-column (:left layout-data) :left selected cursor raw-data)
+          (render-column (:left layout-data) :left selected view-cursor)
 
           ;; Center: selected artifact
           [:div {:class "relative flex flex-col justify-center w-[280px] h-full"}
            (render-box (:selected-box layout-data) true (h/action))]
 
           ;; Right column: dependencies
-          (render-column (:right layout-data) :right selected cursor raw-data)))]
+          (render-column (:right layout-data) :right selected view-cursor)))]
 
       ;; Properties panel — fixed-width sidebar on the right
       (when layout-data
-        (render-properties-panel cursor active-db (:selected-box layout-data) tab-roots))]
+        (render-properties-panel view-cursor active-db (:selected-box layout-data) tab-roots))]
 
      ;; Footer with summary statistics and optional category popup
-     (render-footer cursor active-db)
+     (render-footer view-cursor active-db)
 
      ;; Floating action button — settings menu (bottom-right corner)
-     (render-fab cursor hidden-libs raw-data)
+     (render-fab view-cursor)
 
      ;; Disconnect modal — invisible by default, revealed by client-side JS.
      ;; data-ignore-morph prevents Datastar's DOM morph from reverting the

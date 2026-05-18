@@ -14,8 +14,8 @@
 
 (defn- build-dependants-index
   "Builds a map of {artifact-key -> [{:from artifact-key :requested-version string}]}
-  by inverting all :deps relationships in the raw data."
-  [raw-data]
+  by inverting all :deps relationships in the dependency data."
+  [dependency-data]
   (reduce-kv
    (fn [index artifact-key {:keys [deps]}]
      (reduce-kv
@@ -26,10 +26,10 @@
       index
       deps))
    {}
-   raw-data))
+   dependency-data))
 
 (defn build-db
-  "Builds an indexed dependency database from raw EDN data.
+  "Builds an indexed dependency database from dependency data.
 
   Ensures every artifact has a :label (defaults to the string form of the key).
   Builds a label index for fast search.
@@ -38,7 +38,7 @@
   - :artifacts     - {key -> {:version :label :deps ...}} with :label guaranteed
   - :dependants    - reverse index {key -> [{:from key :requested-version v}]}
   - :by-label      - {lowercase-label -> key} for search"
-  [raw-data]
+  [dependency-data]
   (let [;; Ensure every artifact has a :label, and sort :deps alphabetically.
         ;; Filter out deps that reference unresolved artifacts — these are
         ;; version-evicted transitive dependencies that appear in the trace
@@ -50,10 +50,10 @@
                                     (update :deps (fn [deps]
                                                     (when (seq deps)
                                                       (into (sorted-map)
-                                                            (filter #(contains? raw-data (key %)))
+                                                            (filter #(contains? dependency-data (key %)))
                                                             deps)))))))
                    {}
-                   raw-data)
+                   dependency-data)
         ;; Build label index: lowercase label -> artifact key
         by-label (reduce-kv
                   (fn [m k {:keys [label]}]
@@ -65,10 +65,10 @@
                     (fn [m k entries]
                       (assoc m k (vec (sort-by :from entries))))
                     {}
-                    (build-dependants-index raw-data))]
-    {:artifacts artifacts
+                    (build-dependants-index dependency-data))]
+    {:artifacts  artifacts
      :dependants dependants
-     :by-label by-label}))
+     :by-label   by-label}))
 
 (defn artifact-keys
   "Returns all artifact keys in the database."
@@ -125,18 +125,17 @@
              :resolved-version resolved})
           (get-in db [:dependants artifact-key]))))
 
-(defn- filter-raw-data
-  "Walks raw-data from ROOT, excluding hidden-libs and any artifact only
-  reachable through them. Returns a filtered raw-data map suitable for
-  passing directly to build-db."
-  [raw-data hidden-libs]
+(defn- filter-dependency-data
+  "Walks dependency-data from ROOT, excluding hidden-libs and any artifact only
+  reachable through them. Returns a filtered map suitable for passing to build-db."
+  [dependency-data hidden-libs]
   (loop [result {} visited #{} queue ['ROOT]]
     (if (empty? queue)
       result
       (let [[current & rest-q] queue]
         (if (contains? visited current)
           (recur result visited rest-q)
-          (let [info          (get raw-data current)
+          (let [info          (get dependency-data current)
                 filtered-deps (into (sorted-map)
                                     (remove #(contains? hidden-libs (key %)))
                                     (or (:deps info) {}))
@@ -148,26 +147,24 @@
                    (into (vec rest-q) children))))))))
 
 (defn filter-db
-  "Builds a new database from raw-data, excluding hidden-libs and any
+  "Builds a new database from dependency-data, excluding hidden-libs and any
   artifact only reachable through them.
 
-  Walks raw-data from ROOT without traversing into hidden libs, then calls
-  build-db on the result so all secondary indexes are consistent.
-  Returns build-db(raw-data) unchanged when hidden-libs is empty."
-  [raw-data hidden-libs]
-  (build-db (if (empty? hidden-libs)
-              raw-data
-              (filter-raw-data raw-data hidden-libs))))
+  Walks dependency-data from ROOT without traversing into hidden libs, then
+  calls build-db on the result so all secondary indexes are consistent.
+  The original dependency-data is always stored under :dependency-data in the
+  returned db so it can be used to rebuild with different filters later.
+  Returns build-db(dependency-data) when hidden-libs is empty."
+  [dependency-data hidden-libs]
+  (-> (build-db (if (empty? hidden-libs)
+                  dependency-data
+                  (filter-dependency-data dependency-data hidden-libs)))
+      (assoc :dependency-data dependency-data)))
 
-(defn load-raw
-  "Reads an EDN dependency file and returns the raw artifact map
+(defn load-dependency-data
+  "Reads an EDN dependency file and returns the dependency data map
   (suitable for passing to build-db or filter-db)."
   [path]
   (-> path io/reader slurp edn/read-string))
-
-(defn load-db
-  "Reads an EDN dependency file and returns an indexed database."
-  [path]
-  (build-db (load-raw path)))
 
 
