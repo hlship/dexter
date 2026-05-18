@@ -67,6 +67,7 @@
                 :maximum-display 100)]))
     (pout [:faint "Running web server at "] [:bold url] " ...")
     ((requiring-resolve 'net.lewisship.dex.service/start!) {:port port'
+                                                           :raw-data data
                                                            :db (deps/build-db data)})
     (pout "Hit " [:bold "Ctrl+C"] " when done")
     (when-not no-open?

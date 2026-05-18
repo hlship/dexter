@@ -125,13 +125,49 @@
              :resolved-version resolved})
           (get-in db [:dependants artifact-key]))))
 
+(defn- filter-raw-data
+  "Walks raw-data from ROOT, excluding hidden-libs and any artifact only
+  reachable through them. Returns a filtered raw-data map suitable for
+  passing directly to build-db."
+  [raw-data hidden-libs]
+  (loop [result {} visited #{} queue ['ROOT]]
+    (if (empty? queue)
+      result
+      (let [[current & rest-q] queue]
+        (if (contains? visited current)
+          (recur result visited rest-q)
+          (let [info          (get raw-data current)
+                filtered-deps (into (sorted-map)
+                                    (remove #(contains? hidden-libs (key %)))
+                                    (or (:deps info) {}))
+                children      (->> (keys (:deps info))
+                                   (remove hidden-libs)
+                                   (remove visited))]
+            (recur (assoc result current (assoc info :deps filtered-deps))
+                   (conj visited current)
+                   (into (vec rest-q) children))))))))
+
+(defn filter-db
+  "Builds a new database from raw-data, excluding hidden-libs and any
+  artifact only reachable through them.
+
+  Walks raw-data from ROOT without traversing into hidden libs, then calls
+  build-db on the result so all secondary indexes are consistent.
+  Returns build-db(raw-data) unchanged when hidden-libs is empty."
+  [raw-data hidden-libs]
+  (build-db (if (empty? hidden-libs)
+              raw-data
+              (filter-raw-data raw-data hidden-libs))))
+
+(defn load-raw
+  "Reads an EDN dependency file and returns the raw artifact map
+  (suitable for passing to build-db or filter-db)."
+  [path]
+  (-> path io/reader slurp edn/read-string))
+
 (defn load-db
   "Reads an EDN dependency file and returns an indexed database."
   [path]
-  (-> path
-      io/reader
-      slurp
-      edn/read-string
-      build-db))
+  (build-db (load-raw path)))
 
 
