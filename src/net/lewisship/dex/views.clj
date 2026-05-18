@@ -135,6 +135,14 @@
                (update :tab-history
                        (fn [h] (conj (into [] (remove #{tab-id}) h) tab-id)))))))
 
+;; --- DB Building ---
+
+(defn- rebuild-db-for-view
+  "Builds the filtered dependency db for a view map.
+  Applies :hidden-libs filtering unless :show-hidden? is true."
+  [{:keys [hidden-libs show-hidden?]} dependency-data]
+  (deps/filter-db dependency-data (if show-hidden? #{} hidden-libs)))
+
 ;; --- Column Scrolling ---
 
 (defn- scroll-offset
@@ -550,14 +558,12 @@
                      :data-on:click
                      (h/action
                       (swap! cursor update-active-view
-                             (fn [{:keys [hidden-libs show-hidden?] :as view}]
-                               (let [new-hidden-libs (if (contains? hidden-libs key)
+                             (fn [{:keys [hidden-libs] :as view}]
+                               (let [new-view (assoc view :hidden-libs
+                                                     (if (contains? hidden-libs key)
                                                        (disj hidden-libs key)
-                                                       (conj hidden-libs key))]
-                                 (assoc view
-                                        :hidden-libs new-hidden-libs
-                                        :db (deps/filter-db dependency-data
-                                                            (if show-hidden? #{} new-hidden-libs)))))))}
+                                                       (conj hidden-libs key)))]
+                                 (assoc new-view :db (rebuild-db-for-view new-view dependency-data))))))}
             (if is-hidden?
               ;; Eye icon — show / unhide
               (list [:svg {:class "w-4 h-4" :viewBox "0 0 20 20" :fill "currentColor"
@@ -730,12 +736,9 @@
                  :data-on:change
                  (h/action
                   (swap! cursor update-active-view
-                         (fn [{:keys [hidden-libs show-hidden?] :as view}]
-                           (let [new-show-hidden? (not show-hidden?)]
-                             (assoc view
-                                    :show-hidden? new-show-hidden?
-                                    :db (deps/filter-db dependency-data
-                                                        (if new-show-hidden? #{} hidden-libs)))))))}]]
+                         (fn [{:keys [show-hidden?] :as view}]
+                           (let [new-view (assoc view :show-hidden? (not show-hidden?))]
+                             (assoc new-view :db (rebuild-db-for-view new-view dependency-data))))))}]]
        ;; Fade exact connections — purely client-side signal
        [:label {:class "label cursor-pointer gap-3 px-1 py-2 rounded hover:bg-base-200"}
         [:span {:class "label-text text-sm"} "Fade Exact Connections"]
@@ -764,9 +767,8 @@
         ;; The toggle action builds eagerly to avoid a double-render and broken animation.
         _ (when (nil? (:db (active-view @view-cursor)))
             (swap! view-cursor update-active-view
-                   (fn [{:keys [hidden-libs show-hidden?] :as view}]
-                     (assoc view :db (deps/filter-db dependency-data
-                                                     (if show-hidden? #{} hidden-libs))))))
+                   (fn [view]
+                     (assoc view :db (rebuild-db-for-view view dependency-data)))))
         ;; Safety net: if the selected artifact is not in the current db (e.g. a hidden
         ;; lib was selected when View Hidden was turned off), walk nav-history backwards
         ;; to restore the most recent visible artifact. Falls back to ROOT if none found.
