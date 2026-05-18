@@ -1,2 +1,18 @@
 @import "tailwindcss";
 @plugin "daisyui";
+
+/* Arrow styles — applied to SVG path elements by main.js.
+   stroke colors must stay in sync with match->color in layout.clj.
+   fill is set to none for the path itself; context-stroke on the marker
+   means the arrowhead automatically matches the path's stroke color. */
+
+.arrow-exact        { stroke: #000000; }
+.arrow-compatible   { stroke: #16a34a; }
+.arrow-incompatible { stroke: #dc2626; }
+.arrow-unknown      { stroke: #ca8a04; }
+.arrow-default      { stroke: #64748b; }
+
+/* Faded exact-match arrows — triggered by the $fadeExactConnections signal
+   adding the .fade-exact class to #dep-viewer via data-class.
+   Opacity on the group covers both the stroke and the arrowhead marker. */
+.fade-exact .arrow-group-exact { opacity: 0.1; }

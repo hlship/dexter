@@ -120,8 +120,6 @@
 
 ;; --- Column Scrolling ---
 
-
-
 (defn- scroll-offset
   "Returns a function that adjusts a column offset by `delta` (+1 or -1),
   clamping to [0, total - max-visible].  `column-key` is the layout key
@@ -135,7 +133,7 @@
                                            hidden-libs max-visible)
         {:keys [total]} (get layout-data column-key)
         max-visible (or max-visible layout/default-max-visible)
-        max-offset  (max 0 (- total max-visible))]
+        max-offset (max 0 (- total max-visible))]
     (fn [current]
       (max 0 (min max-offset (+ current delta))))))
 
@@ -214,22 +212,31 @@
 
 ;; --- Connection Data ---
 
+(defn- exact-connection?
+  "Returns true when the requested and resolved versions are an exact match."
+  [{:keys [requested-version resolved-version]}]
+  (= :exact (layout/version-match requested-version resolved-version)))
+
 (defn- connections->json
   "Converts layout connection data to JSON for client-side arrow rendering.
   Each connection includes from/to element IDs, version info, and connection type.
-  Bypass connections also include the center box ID for routing around it."
+  Bypass connections also include the center box ID for routing around it.
+
+  Exact connections are sorted first so they render behind non-exact arrows.
+  Fading is handled entirely client-side via a CSS class on the dep-viewer
+  container driven by a Datastar signal."
   [connections center-id]
-  (json/generate-string
-   (mapv (fn [{:keys [from-id to-id requested-version resolved-version connection-type color]}]
-           (cond-> {:fromId from-id
-                    :toId to-id
-                    :requestedVersion requested-version
-                    :resolvedVersion resolved-version
-                    :type (name connection-type)
-                    :color color}
-             (= :bypass connection-type)
-             (assoc :centerId center-id)))
-         connections)))
+  (let [sorted (sort-by #(if (exact-connection? %) 0 1) connections)]
+    (json/generate-string
+     (mapv (fn [{:keys [from-id to-id requested-version resolved-version connection-type]}]
+             (cond-> {:fromId from-id
+                      :toId to-id
+                      :requestedVersion requested-version
+                      :resolvedVersion resolved-version
+                      :type (name connection-type)
+                      :matchType (name (layout/version-match requested-version resolved-version))}
+               (= :bypass connection-type) (assoc :centerId center-id)))
+           sorted))))
 
 ;; --- Footer ---
 
@@ -429,8 +436,8 @@
   [cursor db selected-box tab-roots hidden-libs]
   (let [{:keys [key name version]} selected-box
         dependencies (remove #(contains? hidden-libs (:to %)) (deps/dependencies db key))
-        dependants   (remove #(contains? hidden-libs (:from %)) (deps/dependants db key))
-        has-tab?     (contains? tab-roots key)
+        dependants (remove #(contains? hidden-libs (:from %)) (deps/dependants db key))
+        has-tab? (contains? tab-roots key)
         {:keys [description url jar-size licenses]} (pom/pom-metadata key version)]
     [:div {:class "w-80 shrink-0 bg-white border-l border-slate-200
                    flex flex-col overflow-hidden"}
@@ -475,10 +482,10 @@
          (for [{:keys [name url]} licenses]
            (if url
              [:div
-              [:a {:class  "text-sm text-blue-600 hover:text-blue-800 hover:underline"
-                   :href   url
+              [:a {:class "text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                   :href url
                    :target "_blank"
-                   :rel    "noopener noreferrer"}
+                   :rel "noopener noreferrer"}
                name]]
              [:div {:class "text-sm text-slate-800"} name]))])
       ;; Homepage URL from POM
@@ -486,10 +493,10 @@
         [:div
          [:div {:class "text-xs font-medium text-slate-400 uppercase tracking-wide mb-1"}
           "Homepage"]
-         [:a {:class  "text-sm text-blue-600 hover:text-blue-800 hover:underline break-all"
-              :href   url
+         [:a {:class "text-sm text-blue-600 hover:text-blue-800 hover:underline break-all"
+              :href url
               :target "_blank"
-              :rel    "noopener noreferrer"}
+              :rel "noopener noreferrer"}
           url]])
       ;; Maven Repository link
       (when (or description url)
@@ -499,10 +506,10 @@
           [:div
            [:div {:class "text-xs font-medium text-slate-400 uppercase tracking-wide mb-1"}
             "Maven Repository"]
-           [:a {:class  "text-sm text-blue-600 hover:text-blue-800 hover:underline"
-                :href   mvn-url
+           [:a {:class "text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                :href mvn-url
                 :target "_blank"
-                :rel    "noopener noreferrer"}
+                :rel "noopener noreferrer"}
             "mvnrepository.com"]]))
       ;; Open in new tab button
       [:div
@@ -635,6 +642,36 @@
                :let [label (:label (deps/artifact-info db k))]]
            [:option {:value label}])]])]))
 
+;; --- Floating Action Button (Settings) ---
+
+(defn- render-fab
+  "Renders a floating action button in the bottom-right corner that opens a
+  settings menu. The menu contains toggle switches for display options.
+  Uses DaisyUI's dropdown with a details/summary element for open/close.
+  Toggle state is managed by the client-side $fadeExactConnections signal —
+  no server round-trip, change takes effect instantly via CSS."
+  []
+  [:div {:class "fixed bottom-6 right-6 z-30"}
+   [:div {:class "dropdown dropdown-top dropdown-end"}
+    [:div {:tabindex "0"
+           :role "button"
+           :class "btn btn-circle btn-primary shadow-lg"}
+     ;; Settings gear icon
+     [:svg {:class "w-5 h-5" :viewBox "0 0 20 20" :fill "currentColor"
+            :xmlns "http://www.w3.org/2000/svg"}
+      [:path {:fill-rule "evenodd" :clip-rule "evenodd"
+              :d "M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"}]]]
+    [:div {:tabindex "0"
+           :class "dropdown-content z-[1] menu mb-2 p-3 shadow-lg bg-base-100 rounded-box w-64 border border-base-300"}
+     [:div {:class "text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 px-1"}
+      "Display Options"]
+     ;; Fade exact connections switch — purely client-side signal
+     [:label {:class "label cursor-pointer gap-3 px-1 py-2 rounded hover:bg-base-200"}
+      [:span {:class "label-text text-sm"} "Fade Exact Connections"]
+      [:input {:type "checkbox"
+               :class "toggle toggle-primary toggle-sm"
+               :data-bind "fadeExactConnections"}]]]]])
+
 (defn home-page [req]
   (let [db (:db @(:hyper/app-state req))
         root-label (:label (deps/artifact-info db 'ROOT))
@@ -676,6 +713,7 @@
       [:div (cond-> {:id "dep-viewer"
                      :class "flex-1 min-w-0 relative flex justify-center gap-[120px] overflow-auto"
                      :data-track-height "true"
+                     :data-class "{'fade-exact': $fadeExactConnections}"
                      :data-on:change__debounce.300ms
                      (h/action
                       (when-let [mv (some-> $value not-empty parse-long)]
@@ -712,10 +750,18 @@
      ;; Footer with summary statistics and optional category popup
      (render-footer cursor db hidden-libs)
 
+     ;; Floating action button — settings menu (bottom-right corner)
+     (render-fab)
+
      ;; Disconnect modal — invisible by default, revealed by client-side JS.
      ;; data-ignore-morph prevents Datastar's DOM morph from reverting the
      ;; visibility change after a server re-render.
-     [:div {:id "modal-container" :data-ignore-morph true}
+     ;; data-signals__ifmissing declares the fadeExactConnections signal only
+     ;; on first mount; subsequent renders leave the current value untouched.
+     ;; data-ignore-morph gives an extra guarantee that this element is never
+     ;; re-processed by Datastar's morph pass.
+     [:div {:id "modal-container" :data-ignore-morph true
+            :data-signals__ifmissing "{fadeExactConnections: false}"}
       [:div {:id "disconnect-modal" :class "modal"}
        [:div {:class "modal-box text-center"}
         [:p {:class "text-lg"} "You may close this window now."]]

@@ -3,12 +3,14 @@ import { attribute } from "./datastar.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-// Arrow color palette — must match server-side version-match-color values.
-const ARROW_COLORS = ["#000000", "#16a34a", "#dc2626", "#ca8a04", "#64748b"];
 
-// Creates <defs> with arrowhead markers and minimal SVG styles.
+
+// Creates <defs> with a single arrowhead marker and minimal SVG styles.
+// The marker uses fill="context-stroke" so the arrowhead automatically
+// inherits the stroke color of whichever path element references it —
+// no per-color marker duplication needed.
 function ensureArrowDefs(svg) {
-  if (svg.querySelector("#arrowhead-0")) return;
+  if (svg.querySelector("#arrowhead")) return;
 
   // Minimal SVG styles — just pointer-events for arrow interactivity
   const style = document.createElementNS(SVG_NS, "style");
@@ -18,31 +20,22 @@ function ensureArrowDefs(svg) {
   `;
   svg.appendChild(style);
 
-  // One arrowhead marker per color
   const defs = document.createElementNS(SVG_NS, "defs");
-  ARROW_COLORS.forEach((color, i) => {
-    const marker = document.createElementNS(SVG_NS, "marker");
-    marker.setAttribute("id", `arrowhead-${i}`);
-    marker.setAttribute("markerWidth", "8");
-    marker.setAttribute("markerHeight", "6");
-    marker.setAttribute("refX", "8");
-    marker.setAttribute("refY", "3");
-    marker.setAttribute("orient", "auto");
-    marker.setAttribute("markerUnits", "strokeWidth");
+  const marker = document.createElementNS(SVG_NS, "marker");
+  marker.setAttribute("id", "arrowhead");
+  marker.setAttribute("markerWidth", "8");
+  marker.setAttribute("markerHeight", "6");
+  marker.setAttribute("refX", "8");
+  marker.setAttribute("refY", "3");
+  marker.setAttribute("orient", "auto");
+  marker.setAttribute("markerUnits", "strokeWidth");
 
-    const path = document.createElementNS(SVG_NS, "path");
-    path.setAttribute("d", "M0,0 L8,3 L0,6 Z");
-    path.setAttribute("fill", color);
-    marker.appendChild(path);
-    defs.appendChild(marker);
-  });
+  const path = document.createElementNS(SVG_NS, "path");
+  path.setAttribute("d", "M0,0 L8,3 L0,6 Z");
+  path.setAttribute("fill", "context-stroke");
+  marker.appendChild(path);
+  defs.appendChild(marker);
   svg.appendChild(defs);
-}
-
-// Returns the marker URL for a given arrow color.
-function markerForColor(color) {
-  const idx = ARROW_COLORS.indexOf(color);
-  return `url(#arrowhead-${idx >= 0 ? idx : ARROW_COLORS.length - 1})`;
 }
 
 // Creates or reuses a shared HTML tooltip for version mismatch labels.
@@ -143,12 +136,13 @@ function drawArrows(container, connections) {
     const toRect = toEl.getBoundingClientRect();
 
     const d = computeArrowPath(fromRect, toRect, containerRect, conn);
-    const color = conn.color || "#64748b";
     const isMismatch = conn.requestedVersion !== conn.resolvedVersion;
 
-    // Group: invisible hit area + visible arrow
+    // Group: invisible hit area + visible arrow.
+    // arrow-group-<matchType> lets CSS target groups by match type,
+    // e.g. .fade-exact .arrow-group-exact { opacity: 0.25 }.
     const group = document.createElementNS(SVG_NS, "g");
-    group.classList.add("arrow-group");
+    group.classList.add("arrow-group", `arrow-group-${conn.matchType || "default"}`);
 
     // Wide invisible path for easier hover targeting
     const hitArea = document.createElementNS(SVG_NS, "path");
@@ -159,30 +153,34 @@ function drawArrows(container, connections) {
     hitArea.setAttribute("fill", "none");
     group.appendChild(hitArea);
 
-    // Visible arrow path
+    // Visible arrow path — stroke color and weight come from CSS.
+    // The single #arrowhead marker uses fill="context-stroke" so it
+    // automatically matches whatever stroke color CSS assigns to this path.
     const arrowPath = document.createElementNS(SVG_NS, "path");
-    arrowPath.classList.add("arrow");
+    arrowPath.classList.add("arrow", `arrow-${conn.matchType || "default"}`);
     arrowPath.setAttribute("d", d);
-    arrowPath.setAttribute("stroke", color);
     arrowPath.setAttribute("stroke-width", "2");
     arrowPath.setAttribute("fill", "none");
-    arrowPath.setAttribute("marker-end", markerForColor(color));
+    arrowPath.setAttribute("marker-end", "url(#arrowhead)");
     group.appendChild(arrowPath);
 
     svg.appendChild(group);
 
-    // Hover: thicken + brighten arrow, show version tooltip for mismatches
+    // Hover: thicken + brighten arrow, show version tooltip for mismatches.
+    // Tooltip color is read from the element's computed stroke so it stays
+    // in sync with whatever CSS class was applied.
     group.addEventListener("mouseenter", () => {
       arrowPath.setAttribute("stroke-width", "4");
       arrowPath.style.filter = "brightness(1.4)";
 
       if (isMismatch) {
+        const strokeColor = getComputedStyle(arrowPath).stroke;
         const totalLen = arrowPath.getTotalLength();
         const mid = arrowPath.getPointAtLength(totalLen / 2);
 
         tooltip.textContent = conn.requestedVersion;
-        tooltip.style.color = color;
-        tooltip.style.borderColor = color;
+        tooltip.style.color = strokeColor;
+        tooltip.style.borderColor = strokeColor;
         tooltip.style.left = `${mid.x}px`;
         tooltip.style.top = `${mid.y - 6}px`;
         tooltip.classList.remove("opacity-0");
