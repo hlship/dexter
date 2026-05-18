@@ -450,8 +450,9 @@
   dependencies/dependants broken down by version-match category.
   db should be the already-filtered active database.
   tab-roots is a set of artifact keys that already have open tabs.
-  hidden-libs is the current tab's set of hidden artifact keys."
-  [cursor db selected-box tab-roots hidden-libs]
+  hidden-libs is the current tab's set of hidden artifact keys.
+  dependency-data is the raw artifact map used to rebuild the db on hide/show."
+  [cursor db selected-box tab-roots hidden-libs dependency-data]
   (let [{:keys [key name version]} selected-box
         dependencies (deps/dependencies db key)
         dependants (deps/dependants db key)
@@ -549,12 +550,14 @@
                      :data-on:click
                      (h/action
                       (swap! cursor update-active-view
-                             (fn [{:keys [hidden-libs] :as view}]
-                               (assoc view
-                                      :hidden-libs (if (contains? hidden-libs key)
-                                                     (disj hidden-libs key)
-                                                     (conj hidden-libs key))
-                                      :db nil))))}
+                             (fn [{:keys [hidden-libs show-hidden?] :as view}]
+                               (let [new-hidden-libs (if (contains? hidden-libs key)
+                                                       (disj hidden-libs key)
+                                                       (conj hidden-libs key))]
+                                 (assoc view
+                                        :hidden-libs new-hidden-libs
+                                        :db (deps/filter-db dependency-data
+                                                            (if show-hidden? #{} new-hidden-libs)))))))}
             (if is-hidden?
               ;; Eye icon — show / unhide
               (list [:svg {:class "w-4 h-4" :viewBox "0 0 20 20" :fill "currentColor"
@@ -701,7 +704,7 @@
 
   'Fade Exact Connections' is a client-side toggle bound to a Datastar signal
   that adds a CSS class to dim exact-match arrows — no server round-trip."
-  [cursor]
+  [cursor dependency-data]
   (let [show-hidden? (:show-hidden? (active-view @cursor))]
     [:div {:class "fixed bottom-6 right-6 z-30"}
      [:div {:class "dropdown dropdown-top dropdown-end"}
@@ -718,7 +721,7 @@
        [:div {:class "text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 px-1"}
         "Display Options"]
      ;; View Hidden — server-side toggle, per-tab.
-     ;; Reads :dependency-data from the cached view db so no extra arg needed.
+     ;; View Hidden — server-side toggle, per-tab.
        [:label {:class "label cursor-pointer gap-3 px-1 py-2 rounded hover:bg-base-200"}
         [:span {:class "label-text text-sm"} "View Hidden"]
         [:input {:type "checkbox"
@@ -727,8 +730,12 @@
                  :data-on:change
                  (h/action
                   (swap! cursor update-active-view
-                         (fn [{:keys [show-hidden?] :as view}]
-                           (assoc view :show-hidden? (not show-hidden?) :db nil))))}]]
+                         (fn [{:keys [hidden-libs show-hidden?] :as view}]
+                           (let [new-show-hidden? (not show-hidden?)]
+                             (assoc view
+                                    :show-hidden? new-show-hidden?
+                                    :db (deps/filter-db dependency-data
+                                                        (if new-show-hidden? #{} hidden-libs)))))))}]]
        ;; Fade exact connections — purely client-side signal
        [:label {:class "label cursor-pointer gap-3 px-1 py-2 rounded hover:bg-base-200"}
         [:span {:class "label-text text-sm"} "Fade Exact Connections"]
@@ -839,13 +846,13 @@
 
       ;; Properties panel — fixed-width sidebar on the right
       (when layout-data
-        (render-properties-panel view-cursor active-db (:selected-box layout-data) tab-roots hidden-libs))]
+        (render-properties-panel view-cursor active-db (:selected-box layout-data) tab-roots hidden-libs dependency-data))]
 
      ;; Footer with summary statistics and optional category popup
      (render-footer view-cursor active-db)
 
      ;; Floating action button — settings menu (bottom-right corner)
-     (render-fab view-cursor)
+     (render-fab view-cursor dependency-data)
 
      ;; Disconnect modal — invisible by default, revealed by client-side JS.
      ;; data-ignore-morph prevents Datastar's DOM morph from reverting the
