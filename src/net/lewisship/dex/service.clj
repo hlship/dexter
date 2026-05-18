@@ -12,12 +12,12 @@
          :get #'views/home-page}]])
 
 (defn- create-handler
-  "Creates the Ring handler, seeding `db` into Hyper's app-state so it
-  is available on both initial page loads and SSE re-renders."
-  [db]
+  "Creates the Ring handler, seeding dependency-data into Hyper's app-state.
+  home-page builds and caches the active db on demand from dependency-data."
+  [dependency-data]
   (h/create-handler
    #'routes
-   :app-state (atom (assoc (state/init-state) :db db))
+   :app-state (atom (assoc (state/init-state) :dependency-data dependency-data))
    :static-resources "public"
    :datastar-script [:script {:type "module"
                               :src "/js/main.js"}]
@@ -29,12 +29,12 @@
 (defonce *app (atom nil))
 
 (defn start!
-  [{:keys [port db]}]
+  [{:keys [port dependency-data]}]
   (if @*app
     :already-running
     (do
       (reset! *app
-              (h/start! (create-handler db) {:port (or port 10240)}))
+              (h/start! (create-handler dependency-data) {:port (or port 10240)}))
       :started)))
 
 (defn stop!

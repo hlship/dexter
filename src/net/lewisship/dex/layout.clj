@@ -118,19 +118,14 @@
 
 (defn- artifact-box
   "Creates a box descriptor for an artifact.
-  hidden-libs is used to determine leaf status — an artifact is a leaf if
-  it has no dependencies after filtering out hidden libs."
-  [db artifact-key column row hidden-libs]
-  (let [info (deps/artifact-info db artifact-key)
-        dep-keys (keys (:deps info))
-        visible-deps (if (seq hidden-libs)
-                       (remove #(contains? hidden-libs %) dep-keys)
-                       dep-keys)]
+  An artifact is a leaf if it has no dependencies in the (possibly filtered) db."
+  [db artifact-key column row]
+  (let [info (deps/artifact-info db artifact-key)]
     {:id (str "box-" artifact-key)
      :key artifact-key
      :name (:label info)
      :version (:version info)
-     :leaf? (empty? visible-deps)
+     :leaf? (empty? (:deps info))
      :column column
      :row row}))
 
@@ -177,30 +172,25 @@
           visible-keys)))
 
 (defn summary-stats
-  "Computes summary statistics for the entire dependency database.
-
-  Dependencies whose target is in `hidden-libs` are excluded from all counts.
+  "Computes summary statistics for the dependency database.
 
   Returns a map with:
-  - :artifact-count  - total number of visible artifacts (excluding ROOT and hidden-libs)
+  - :artifact-count  - total number of artifacts (excluding ROOT)
   - :dep-count       - total number of dependency relationships
   - :compatible      - count of unique artifacts with compatible (but not exact) version matches
   - :incompatible    - count of unique artifacts with incompatible version matches
   - :unknown         - count of unique artifacts with unknown version matches (git SHA, etc.)"
-  [db hidden-libs]
-  (let [all-keys (remove #(or (= 'ROOT %) (contains? hidden-libs %))
-                         (deps/artifact-keys db))
+  [db]
+  (let [all-keys (remove #(= 'ROOT %) (deps/artifact-keys db))
         {:keys [dep-count] :as counts}
         (reduce
          (fn [acc artifact-key]
            (reduce
             (fn [acc {:keys [to requested-version resolved-version]}]
-              (if (contains? hidden-libs to)
-                acc
-                (let [m (version-match requested-version resolved-version)]
-                  (-> acc
-                      (update :dep-count inc)
-                      (update m (fnil conj #{}) to)))))
+              (let [m (version-match requested-version resolved-version)]
+                (-> acc
+                    (update :dep-count inc)
+                    (update m (fnil conj #{}) to))))
             acc
             (deps/dependencies db artifact-key)))
          {:dep-count 0}
@@ -217,24 +207,21 @@
   Iterates all dependency relationships and classifies each by version-match.
   Collects the *dependency target* artifact for each non-exact match into
   category sets. An artifact may appear in multiple categories.
-  Dependencies whose target is in `hidden-libs` are excluded.
 
   Returns a map of:
   - :compatible    - sorted vec of {:key artifact-key :label string}
   - :incompatible  - sorted vec of {:key artifact-key :label string}
   - :unknown       - sorted vec of {:key artifact-key :label string}"
-  [db hidden-libs]
+  [db]
   (let [;; Accumulate sets of artifact keys per category
         by-cat (reduce
                 (fn [acc artifact-key]
                   (reduce
                    (fn [acc {:keys [to requested-version resolved-version]}]
-                     (if (contains? hidden-libs to)
-                       acc
-                       (let [m (version-match requested-version resolved-version)]
-                         (if (= :exact m)
-                           acc
-                           (update acc m (fnil conj #{}) to)))))
+                     (let [m (version-match requested-version resolved-version)]
+                       (if (= :exact m)
+                         acc
+                         (update acc m (fnil conj #{}) to))))
                    acc
                    (deps/dependencies db artifact-key)))
                 {}
@@ -254,12 +241,10 @@
   "Computes the full layout for the dependency viewer.
 
   Parameters:
-  - db             - the dependency database
+  - db             - the dependency database (pre-filtered as needed)
   - selected       - the currently selected artifact key
   - left-offset    - windowing offset for the dependants column
   - right-offset   - windowing offset for the dependencies column
-  - hidden-libs    - set of lib keys to hide from dependency/dependant columns
-                     (unless the hidden lib itself is selected)
   - max-visible    - maximum nodes per column (computed from viewport height)
 
   Returns a map with:
@@ -267,23 +252,15 @@
   - :left           - windowed dependants column {:items :boxes :total :offset :before :after}
   - :right          - windowed dependencies column {:items :boxes :total :offset :before :after}
   - :connections    - vector of connection records between visible artifacts"
-  [db selected left-offset right-offset hidden-libs max-visible]
+  [db selected left-offset right-offset max-visible]
   (let [max-visible (or max-visible default-max-visible)
 
         ;; Center box
-        selected-box (artifact-box db selected :center 0 hidden-libs)
-
-        ;; Hidden libs are filtered out of columns unless they are the selected artifact
-        hide? (fn [k] (and (seq hidden-libs)
-                           (contains? hidden-libs k)
-                           (not= k selected)))
+        selected-box (artifact-box db selected :center 0)
 
         ;; Build full lists of dependency/dependant keys
-        dep-connections (deps/dependencies db selected)
-        dept-connections (deps/dependants db selected)
-
-        dep-keys (into [] (remove hide?) (mapv :to dep-connections))
-        dept-keys (into [] (remove hide?) (mapv :from dept-connections))
+        dep-keys  (mapv :to (deps/dependencies db selected))
+        dept-keys (mapv :from (deps/dependants db selected))
 
         ;; Apply windowing
         left-window (window-items dept-keys left-offset max-visible)
@@ -291,10 +268,10 @@
 
         ;; Build box descriptors for visible items
         left-boxes (vec (map-indexed
-                         (fn [row k] (artifact-box db k :left row hidden-libs))
+                         (fn [row k] (artifact-box db k :left row))
                          (:items left-window)))
         right-boxes (vec (map-indexed
-                          (fn [row k] (artifact-box db k :right row hidden-libs))
+                          (fn [row k] (artifact-box db k :right row))
                           (:items right-window)))
 
         ;; All visible keys and a lookup map

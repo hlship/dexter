@@ -9,43 +9,44 @@
             [net.lewisship.dex.maven-reader :as maven-reader]
             [net.lewisship.dex.service :as service]))
 
-;; Holds the current db for REPL convenience; load data into this atom,
-;; then pass @*db to service/start!.
-(defonce *db (atom nil))
+;; Holds the current dependency data for REPL convenience.
+;; Load data into this atom, then call start!.
+(defonce *dependency-data (atom nil))
+
+(defn- start!
+  "Starts the service with the current dependency data."
+  []
+  (service/start! {:dependency-data @*dependency-data}))
 
 (comment
 
   ;; --- Running from the CLI entry point ---
 
   (cli/set-prevent-exit! true)
-  
+
   ;; --- Loading data manually ---
 
   ;; Load from pre-built test data
-  (reset! *db (deps/load-db "test-resources/dex/project-deps.edn"))
+  (reset! *dependency-data (deps/load-dependency-data "test-resources/dex/project-deps.edn"))
 
   ;; Or resolve live from a deps.edn (this project as an example)
-  (reset! *db
-          (-> (deps-reader/read-deps (fs/file "deps.edn") {:aliases ["dev" "test"]})
-              deps/build-db))
+  (reset! *dependency-data
+          (deps-reader/read-deps (fs/file "deps.edn") {:aliases ["dev" "test"]}))
 
-  (reset! *db
-          (-> (lein-reader/read-deps (fs/file "../../nubank/balatro/project.clj") nil)
-              deps/build-db))
+  (reset! *dependency-data
+          (lein-reader/read-deps (fs/file "../../nubank/balatro/project.clj") nil))
 
-  (reset! *db
-          (-> (maven-reader/read-deps (fs/file "../spring-petclinic/pom.xml") nil)
-              deps/build-db))
+  (reset! *dependency-data
+          (maven-reader/read-deps (fs/file "../spring-petclinic/pom.xml") nil))
 
   ;; --- Server lifecycle ---
 
-  (service/start! {:db @*db})
-
+  (start!)
 
   (do
     (reload)
     (service/stop!)
-    (service/start! {:db @*db}))
+    (start!))
 
   ;;
   )

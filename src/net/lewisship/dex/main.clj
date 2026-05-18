@@ -2,8 +2,7 @@
   (:require [babashka.fs :as fs]
             [clj-commons.ansi :refer [pout perr]]
             [clj-commons.humanize :as h]
-            [net.lewisship.cli-tools :as cli :refer [defcommand abort]]
-            [net.lewisship.dex.deps :as deps])
+            [net.lewisship.cli-tools :as cli :refer [defcommand abort]])
   (:import (java.net ServerSocket)))
 
 (defn- free-port
@@ -67,7 +66,7 @@
                 :maximum-display 100)]))
     (pout [:faint "Running web server at "] [:bold url] " ...")
     ((requiring-resolve 'net.lewisship.dex.service/start!) {:port port'
-                                                           :db (deps/build-db data)})
+                                                           :dependency-data data})
     (pout "Hit " [:bold "Ctrl+C"] " when done")
     (when-not no-open?
       ((requiring-resolve 'clojure.java.browse/browse-url) url))
