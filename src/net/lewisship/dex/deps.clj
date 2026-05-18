@@ -156,10 +156,9 @@
   returned db so it can be used to rebuild with different filters later.
   Returns build-db(dependency-data) when hidden-libs is empty."
   [dependency-data hidden-libs]
-  (-> (build-db (if (empty? hidden-libs)
-                  dependency-data
-                  (filter-dependency-data dependency-data hidden-libs)))
-      (assoc :dependency-data dependency-data)))
+  (build-db (if (empty? hidden-libs)
+              dependency-data
+              (filter-dependency-data dependency-data hidden-libs))))
 
 (defn load-dependency-data
   "Reads an EDN dependency file and returns the dependency data map
