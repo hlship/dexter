@@ -1,3 +1,5 @@
+# 0.1 -- UNRELEASED
+
 # 0.1-beta-2
 
 - Added floating action button (FAB) settings menu with toggles for fading
