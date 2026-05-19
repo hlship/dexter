@@ -1,4 +1,12 @@
-# 0.1 -- UNRELEASED
+# 0.1-beta-2
+
+- Added floating action button (FAB) settings menu with toggles for fading
+  exact connections and viewing hidden libraries
+
+- Added per-tab Hide/Show button in the properties panel to customize
+  which libraries are hidden
+
+- Bumped dependencies
 
 - Fixed Scoop manifest to use `suggest` instead of `depends` for Java,
   since Scoop can't resolve cross-bucket dependencies
