@@ -82,7 +82,8 @@ h-screen flex-col
 ## Conventions
 
 - **Size bars:** `render-size-bar` in `dex.views` draws a two-tone bar (dark = own `:size`, light = footprint) at the bottom of each box and in the properties panel, scaled against `:max-footprint`. Footprints are computed by `build-db` from the *filtered* data (via `deps/filter-db`), so hidden libs (including `org.clojure/clojure`, hidden by default) and anything reachable only through them are excluded; View Hidden or the per-artifact Hide/Show rebuilds the db and the footprints change accordingly. `:max-footprint` (the bar scale) changes with them. Boxes carry `:size`, `:footprint` and `:max-footprint` from `layout/artifact-box`. The bar is omitted when the data has no sizes (e.g. cached EDN).
-- **Data flow:** The db value is passed to `service/start!` as `:db`, seeded into Hyper's app-state atom, and extracted in views via `(:db @(:hyper/app-state req))`. Views receive db as a parameter — they never access a global atom.
+- **Data flow:** The raw dependency data (from a reader) is passed to `service/start!` as `:dependency-data`, seeded into Hyper's app-state atom, and extracted in `home-page` via `(:dependency-data @(:hyper/app-state req))`. The per-tab db is *derived* during render by the memoized `visible-db` from the tab's `:hidden-libs` and `:show-hidden?`; it is not stored in the view cursor. Views receive db as a parameter — they never access a global atom.
+- **Render purity:** Hyper's render guard warns (`:hyper.warn/effect-in-render`) on cursor `swap!`/`reset!` during render, so `home-page` and the `render-*` functions must not write state. Effects belong in `h/action` bodies. `update-visibility!` (used by the View Hidden toggle and Hide/Show button) changes visibility and falls back to the most recent visible artifact in one action.
 - **Tabs:** Multiple UI tabs allow independent views into the dependency tree. The ROOT tab (id 0) can't be closed. `open-tab!` creates a new tab rooted at an artifact; `close-tab!` removes one and selects the most recently viewed; `select-tab!` switches between tabs. Artifact boxes show a ⊕ icon to open a new tab unless the artifact already has one. `tab-root-set` returns the set of artifact keys that have tabs.
 - **Navigation:** All artifact selection changes (box clicks, search, home) go through `navigate!` which pushes current state onto the active tab's `:nav-history` before switching. `navigate-back!` pops the stack and restores `{:selected :left-offset :right-offset}`. The home button navigates to the root artifact of the current tab (via `active-tab-root`), not necessarily `'ROOT`.
 - **Column scrolling:** Mouse wheel scrolling on columns uses Datastar's built-in `data-on:wheel` with `$scroll-delta-y` (a custom Hyper client param) and `scroll-offset` for bounds-clamped offset updates.
@@ -117,7 +118,7 @@ bb tailwind
 bb test
 ```
 
-**REPL workflow:** Load dependency data into the local `*db` atom in `demo.clj`, then call `(service/start! {:db @*db})`. The db value is seeded into Hyper's app-state and flows to views via the request — views never access a global atom directly.
+**REPL workflow:** Load dependency data into the local `*dependency-data` atom in `demo.clj`, then call `(service/start! {:dependency-data @*dependency-data})`. The dependency data is seeded into Hyper's app-state and flows to views via the request — views never access a global atom directly.
 
 ## Keyboard Shortcuts
 

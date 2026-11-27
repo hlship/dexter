@@ -197,13 +197,12 @@ From the REPL:
 ```clojure
 ;; Load a deps.edn project
 (require '[net.lewisship.dex.deps-reader :as deps-reader])
-(require '[net.lewisship.dex.deps :as deps])
-(def db (-> (deps-reader/read-deps "deps.edn" {:aliases [:dev :test]})
-            deps/build-db))
+(def dependency-data
+  (deps-reader/read-deps "deps.edn" {:aliases [:dev :test]}))
 
 ;; Start the server
 (require '[net.lewisship.dex.service :as service])
-(service/start! {:db db})
+(service/start! {:dependency-data dependency-data})
 
 ;; Stop
 (service/stop!)
