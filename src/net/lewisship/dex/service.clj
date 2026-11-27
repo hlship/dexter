@@ -19,9 +19,11 @@
    #'routes
    :app-state (atom (assoc (state/init-state) :dependency-data dependency-data))
    :static-resources "public"
-   :datastar-script [:script {:type "module"
-                              :src "/js/main.js"}]
+   ;; Hyper adds the Datastar <script> itself and imports `action` from this
+   ;; module; main.js imports the same module URL, so they share one instance.
+   :datastar-url "/js/datastar.js"
    :head [[:link {:rel "icon" :type "image/svg+xml" :href "/favicon.svg"}]
+          [:script {:type "module" :src "/js/main.js"}]
           [:link {:rel "stylesheet" :href "/style.css"}]
           ;; DaisyUI
           [:script {:src "/js/browser.js"}]]))
