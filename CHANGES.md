@@ -1,4 +1,4 @@
-# 0.1 -- UNRELEASED
+# 0.1-beta-3
 
 - The dependants and dependencies columns now scroll natively instead of one artifact
   per click, so very long lists are practical; the "N more" indicators are gone.
@@ -11,6 +11,9 @@
 - Added support for Babashka `bb.edn` files
 
 - Bumped dependencies; adapted to Hyper's new `:datastar-url` option
+
+- The "You may close this window now" dialog appears as soon as the server stops,
+  rather than only after the next click in the browser
 
 # 0.1-beta-2
 
