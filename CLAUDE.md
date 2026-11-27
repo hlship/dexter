@@ -10,7 +10,7 @@ Interactive browser-based tool for exploring JVM dependency graphs. Resolves dep
 
 **Server (Clojure):** Hyper framework (`dynamic-alpha/hyper`) provides server-side rendering with live updates via SSE. Datastar on the client handles DOM morphing and reactivity via `data-*` attributes.
 
-**Client (JS):** A single ES module (`resources/public/js/main.js`) with four Datastar `attribute` plugins: `data-draw-arrows` (SVG arrows + FLIP animation), `data-track-height` (viewport sizing), `data-arrow-nav` (arrow-key navigation for focusable lists), and `data-accel` (keyboard shortcuts). Also includes a `datastar-fetch` event listener for server disconnect detection (see below).
+**Client (JS):** A single ES module (`resources/public/js/main.js`) with three Datastar `attribute` plugins: `data-draw-arrows` (SVG arrows, FLIP animation, and column scroll memory), `data-arrow-nav` (arrow-key navigation for focusable lists), and `data-accel` (keyboard shortcuts). Also includes a `datastar-fetch` event listener for server disconnect detection (see below).
 
 **CSS:** Tailwind CSS v4 — source at `public/style.css`, built via `bb tailwind` into `generated-resources/public/style.css`.
 
@@ -23,7 +23,7 @@ Interactive browser-based tool for exploring JVM dependency graphs. Resolves dep
 | `dex.deps-reader` | Reads `deps.edn` via `tools.deps`, walks trace tree to produce flat artifact map; `read-bb-deps` reads Babashka `bb.edn` the same way (no aliases) |
 | `dex.lein-reader` | Reads `project.clj` via leiningen-core APIs, resolves per-artifact deps via Aether |
 | `dex.maven-reader` | Reads `pom.xml` by running `mvn dependency:tree` as a subprocess and parsing the text tree output |
-| `dex.layout` | Computes three-column layout: windowed columns, connection graph, version match colors, box annotations |
+| `dex.layout` | Computes three-column layout (every box; the side columns scroll natively), connection graph, version match colors, box annotations |
 | `dex.views` | Hiccup rendering — toolbar, columns, boxes, search, arrow connection JSON |
 | `dex.service` | HTTP lifecycle — routes, Hyper handler, `start!`/`stop!`; db passed as option, seeded into Hyper app-state |
 | `dex.main` | CLI entry point — auto-detects project type, resolves deps, launches server + browser |
@@ -52,11 +52,9 @@ Special key `'ROOT` represents the project itself. `:size` is the artifact's siz
  :next-id     1                                                  ; counter for new tab ids
  :tab-history [0 ...]                                            ; tab ids ordered by recency (most recent last)
  :views       {0 {:selected 'ROOT                               ; per-tab view state
-                   :left-offset 0
-                   :right-offset 0
-                   :nav-history [{:selected key :left-offset n :right-offset n} ...]}}
- :hidden-libs #{...}                                             ; shared across all tabs
- :max-visible int?                                               ; shared (viewport-level)
+                   :hidden-libs #{...}                           ; per-tab hidden artifacts
+                   :show-hidden? false                           ; per-tab View Hidden toggle
+                   :nav-history [{:selected key} ...]}}
  :footer-popup nil}                                              ; :compatible, :incompatible, :unknown, or nil
 ```
 
@@ -74,8 +72,8 @@ h-screen flex-col
 **Layout** (output of `layout/compute-layout`):
 ```clojure
 {:selected-box box-descriptor
- :left  {:boxes [...] :before n :after n}  ; windowed dependants column
- :right {:boxes [...] :before n :after n}  ; windowed dependencies column
+ :left  {:boxes [...] :total n}  ; every dependant (the column scrolls natively)
+ :right {:boxes [...] :total n}  ; every dependency
  :connections [{:from :to :from-id :to-id :color :connection-type ...}]}
 ```
 
@@ -85,10 +83,10 @@ h-screen flex-col
 - **Data flow:** The raw dependency data (from a reader) is passed to `service/start!` as `:dependency-data`, seeded into Hyper's app-state atom, and extracted in `home-page` via `(:dependency-data @(:hyper/app-state req))`. The per-tab db is *derived* during render by the memoized `visible-db` from the tab's `:hidden-libs` and `:show-hidden?`; it is not stored in the view cursor. Views receive db as a parameter — they never access a global atom.
 - **Render purity:** Hyper's render guard warns (`:hyper.warn/effect-in-render`) on cursor `swap!`/`reset!` during render, so `home-page` and the `render-*` functions must not write state. Effects belong in `h/action` bodies. `update-visibility!` (used by the View Hidden toggle and Hide/Show button) changes visibility and falls back to the most recent visible artifact in one action.
 - **Tabs:** Multiple UI tabs allow independent views into the dependency tree. The ROOT tab (id 0) can't be closed. `open-tab!` creates a new tab rooted at an artifact; `close-tab!` removes one and selects the most recently viewed; `select-tab!` switches between tabs. Artifact boxes show a ⊕ icon to open a new tab unless the artifact already has one. `tab-root-set` returns the set of artifact keys that have tabs.
-- **Navigation:** All artifact selection changes (box clicks, search, home) go through `navigate!` which pushes current state onto the active tab's `:nav-history` before switching. `navigate-back!` pops the stack and restores `{:selected :left-offset :right-offset}`. The home button navigates to the root artifact of the current tab (via `active-tab-root`), not necessarily `'ROOT`.
-- **Column scrolling:** Mouse wheel scrolling on columns uses Datastar's built-in `data-on:wheel` with `$scroll-delta-y` (a custom Hyper client param) and `scroll-offset` for bounds-clamped offset updates.
+- **Navigation:** All artifact selection changes (box clicks, search, home) go through `navigate!` which pushes current state onto the active tab's `:nav-history` before switching. `navigate-back!` pops the stack and restores `{:selected}` (column scroll positions are remembered by the browser). The home button navigates to the root artifact of the current tab (via `active-tab-root`), not necessarily `'ROOT`.
+- **Column scrolling:** The side columns hold *every* box and scroll natively (`overflow-y-auto`), so there is no windowing, paging or `max-visible`. The left column's scrollbar is on its outer edge (`direction: rtl` on the scroller, `ltr` on the content); both scrollers extend outward past the 280px column by `--sbw` (the measured scrollbar width, published by `main.js`; 0 for overlay scrollbars) plus `scrollbar-clearance` (36px, room for the arrows that bow outward from boxes in the same column), so boxes match the selected box's width and the scrollbars are never drawn over by arrows. `#dep-viewer` has matching horizontal padding, and the gaps between the three columns are shrinkable spacers (120px down to 40px) rather than a fixed `gap`, so the layout still fits down to roughly a 1340px-wide window (320px of which is the properties panel); narrower than that the outer scrollbars clip. Short columns stay centered (`min-h-full` + `justify-center`). Columns with more than `long-list-threshold` boxes show a count label. Each scroller has `data-scroll-key` (tab, selection, side): `main.js` remembers each key's scroll position, so Back restores it and a new selection starts at the top. Arrows are drawn only between boxes whose centers are inside their column's visible area, and are redrawn on scroll; FLIP animation only covers boxes on screen. Note the scroll listener is registered once on `document` (not from a plugin's `apply`, whose cleanup would remove an identical re-added listener).
 - **Rendering:** Hiccup vectors with Tailwind utility classes. Use `h/action` for server-side actions triggered by Datastar `data-on:*` attributes.
-- **Client params:** `$value`, `$key`, `$form-data`, `$scroll-delta-y` etc. are Hyper client params that extract DOM values client-side and send them to the server action. They appear as unresolvable symbols in the editor — this is expected. Custom params (like `$scroll-delta-y`) are defined via the `hyper.client-params/client-param` multimethod at the top of `views.clj`.
+- **Client params:** `$value`, `$key`, `$form-data` etc. are Hyper client params that extract DOM values client-side and send them to the server action. They appear as unresolvable symbols in the editor — this is expected. Custom params can be defined via the `hyper.client-params/client-param` multimethod (none are currently needed).
 - **Action `:when` guards:** `(h/action {:when "js-expr"} ...)` emits a client-side guard that skips the `@post()` when the JS expression is falsy. Useful for key filtering, but note that the guard only gates the POST — any code appended via `str` after the action will still execute unconditionally. When `preventDefault()` or other side-effects must share the same guard, use an explicit JS `if` block wrapping both the action and side-effects.
 - **Signals:** Hyper supports `signal` and `local-signal` for reactive Datastar signals with two-way binding. Not yet used in Dexter but available for future UI state management.
 - **Idiomorph caveat:** Datastar's DOM morpher preserves focused input values. Use `el.value = ''; el.blur()` appended to action expressions when inputs need clearing.

@@ -3,15 +3,12 @@
 
   Given a selected artifact and the dependency database, produces a data structure
   describing:
-  - Three columns of artifact boxes (dependants, selected, dependencies)
-  - Windowed subsets when columns overflow
+  - Three columns of artifact boxes (dependants, selected, dependencies); every
+    box is included, and the side columns scroll natively in the browser
   - Connections between all visible artifacts that have dependency relationships,
     tagged with version info and connection type."
   (:require [net.lewisship.dex.deps :as deps]
             [version-clj.core :as ver]))
-
-;; Maximum number of nodes visible in a single column before windowing kicks in.
-(def ^:const default-max-visible 8)
 
 (def default-hidden-libs
   "Default set of libs to hide from dependency/dependant columns.
@@ -94,27 +91,6 @@
    :compatible 1
    :unknown 2
    :incompatible 3})
-
-(defn- window-items
-  "Applies windowing to a collection of items.
-
-  Returns a map with:
-  - :items       - the visible slice
-  - :total       - total item count
-  - :offset      - current offset
-  - :before      - count of items above the window
-  - :after       - count of items below the window"
-  [items offset n]
-  (let [all (vec items)
-        total (count all)
-        offset (max 0 (min offset (max 0 (- total n))))
-        end (min total (+ offset n))
-        visible (subvec all offset end)]
-    {:items visible
-     :total total
-     :offset offset
-     :before offset
-     :after (max 0 (- total end))}))
 
 (defn- artifact-box
   "Creates a box descriptor for an artifact.
@@ -244,46 +220,36 @@
 (defn compute-layout
   "Computes the full layout for the dependency viewer.
 
+  Every dependant and dependency is included: the side columns scroll natively
+  in the browser, so there is no windowing here.
+
   Parameters:
-  - db             - the dependency database (pre-filtered as needed)
-  - selected       - the currently selected artifact key
-  - left-offset    - windowing offset for the dependants column
-  - right-offset   - windowing offset for the dependencies column
-  - max-visible    - maximum nodes per column (computed from viewport height)
+  - db        - the dependency database (pre-filtered as needed)
+  - selected  - the currently selected artifact key
 
   Returns a map with:
   - :selected-box   - the center box descriptor
-  - :left           - windowed dependants column {:items :boxes :total :offset :before :after}
-  - :right          - windowed dependencies column {:items :boxes :total :offset :before :after}
-  - :connections    - vector of connection records between visible artifacts"
-  [db selected left-offset right-offset max-visible]
-  (let [max-visible (or max-visible default-max-visible)
-
-        ;; Center box
+  - :left           - dependants column {:boxes :total}
+  - :right          - dependencies column {:boxes :total}
+  - :connections    - vector of connection records between the displayed artifacts"
+  [db selected]
+  (let [;; Center box
         selected-box (artifact-box db selected :center 0)
 
-        ;; Build full lists of dependency/dependant keys
-        dep-keys  (mapv :to (deps/dependencies db selected))
-        dept-keys (mapv :from (deps/dependants db selected))
-
-        ;; Apply windowing
-        left-window (window-items dept-keys left-offset max-visible)
-        right-window (window-items dep-keys right-offset max-visible)
-
-        ;; Build box descriptors for visible items
+        ;; Box descriptors for every dependant and dependency
         left-boxes (vec (map-indexed
-                         (fn [row k] (artifact-box db k :left row))
-                         (:items left-window)))
+                         (fn [row {:keys [from]}] (artifact-box db from :left row))
+                         (deps/dependants db selected)))
         right-boxes (vec (map-indexed
-                          (fn [row k] (artifact-box db k :right row))
-                          (:items right-window)))
+                          (fn [row {:keys [to]}] (artifact-box db to :right row))
+                          (deps/dependencies db selected)))
 
-        ;; All visible keys and a lookup map
+        ;; All keys and a lookup map
         all-boxes (into [selected-box] (concat left-boxes right-boxes))
         box-lookup (into {} (map (juxt :key identity)) all-boxes)
         visible-keys (mapv :key all-boxes)
 
-        ;; Find all connections between visible artifacts
+        ;; Find all connections between displayed artifacts
         connections (find-visible-connections db visible-keys box-lookup)
 
         ;; Compute worst version mismatch color per origin box across all connections.
@@ -309,6 +275,6 @@
                                boxes))]
 
     {:selected-box (first (annotate-boxes [selected-box]))
-     :left (assoc left-window :boxes (annotate-boxes left-boxes))
-     :right (assoc right-window :boxes (annotate-boxes right-boxes))
+     :left {:boxes (annotate-boxes left-boxes) :total (count left-boxes)}
+     :right {:boxes (annotate-boxes right-boxes) :total (count right-boxes)}
      :connections connections}))

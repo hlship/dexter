@@ -1,5 +1,9 @@
 # 0.1 -- UNRELEASED
 
+- The dependants and dependencies columns now scroll natively instead of one artifact
+  per click, so very long lists are practical; the "N more" indicators are gone.
+  Scroll positions are remembered per selection, so Back restores them
+
 - Artifact boxes show a size bar: the artifact's own size and its footprint (itself plus all
   transitive dependencies); the properties panel shows the same sizes.
   Footprints count only visible artifacts; showing hidden dependencies (including `org.clojure/clojure`) grows them
