@@ -96,3 +96,16 @@
                   ['babashka/fs 'org.clj-commons/pretty]))
       (is (= "0.5.34" (:version (deps/artifact-info db 'babashka/fs))))
       (is (some? (deps/artifact-info db 'org.clj-commons/pretty))))))
+
+(deftest read-deps-includes-sizes
+  (let [raw-data (deps-reader/read-deps "deps.edn" {})
+        db       (deps/build-db raw-data)]
+    (testing "ROOT size totals the project's own classpath directories"
+      (is (pos? (:size (deps/artifact-info db 'ROOT)))))
+    (testing "library sizes come from the resolved JARs"
+      (is (pos? (:size (deps/artifact-info db 'org.clojure/clojure)))))
+    (testing "footprints include dependencies"
+      (is (> (deps/footprint db 'ROOT)
+             (:size (deps/artifact-info db 'ROOT))))
+      (is (>= (deps/footprint db 'org.clojure/clojure)
+              (:size (deps/artifact-info db 'org.clojure/clojure)))))))

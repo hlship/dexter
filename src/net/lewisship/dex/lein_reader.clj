@@ -16,7 +16,9 @@
   {artifact-key -> {:version string, :label string?, :deps {artifact-key -> {:version string}}}}"
   (:require [babashka.fs :as fs]
             [leiningen.core.classpath :as classpath]
-            [leiningen.core.project :as project]))
+            [leiningen.core.project :as project]
+            [net.lewisship.dex.pom :as pom]
+            [net.lewisship.dex.size :as size]))
 
 (defn- dep-vec->key
   "Extracts the artifact key (symbol) from a lein dependency vector.
@@ -98,6 +100,16 @@
   (project/ensure-dynamic-classloader)
   (project/read (str project-clj-path) (or profiles [])))
 
+(defn- add-jar-sizes
+  "Adds :size (bytes) to each artifact whose JAR is in the local Maven repository."
+  [artifacts]
+  (reduce-kv (fn [m k {:keys [version] :as info}]
+               (assoc m k (if-let [bytes (pom/jar-size k version)]
+                            (assoc info :size bytes)
+                            info)))
+             {}
+             artifacts))
+
 (defn read-deps
   "Reads a Leiningen project's dependencies using leiningen-core APIs.
 
@@ -146,8 +158,14 @@
                     {}
                     hierarchy)
 
+        ;; ROOT's size is the total of the project's own source and resource directories.
+        root-size (size/paths-size (concat (:source-paths project)
+                                           (:java-source-paths project)
+                                           (:resource-paths project)))
+
         root-entry (cond-> {:version project-version}
                      (seq project-label) (assoc :label project-label)
-                     (seq root-deps) (assoc :deps root-deps))]
+                     (seq root-deps) (assoc :deps root-deps)
+                     root-size (assoc :size root-size))]
 
-    (assoc artifacts 'ROOT root-entry)))
+    (assoc (add-jar-sizes artifacts) 'ROOT root-entry)))

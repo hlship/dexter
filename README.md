@@ -103,7 +103,7 @@ Click any artifact to make it the new selection. The display animates to show it
 
 ### Properties Panel
 
-The properties panel is always visible on the right side of the display, showing detailed information about the selected artifact: Maven coordinates, version, JAR size, description, licenses, and links.
+The properties panel is always visible on the right side of the display, showing detailed information about the selected artifact: Maven coordinates, version, size and footprint, description, licenses, and links.
 It also breaks down the artifact's dependencies and dependants by version-match category.
 
 The exact information displayed will vary depending on what information is available in the Maven POM file for
@@ -142,6 +142,25 @@ The right border of each dependency provides information on that artifact's depe
 
 - **Wide colored right border** — the artifact has a dependency with a version mismatch (color reflects the worst mismatch)
 - **Wide grey right border** — the artifact is a leaf node (no further dependencies)
+
+### Size Bars
+
+Each artifact box has a small bar along its bottom edge showing how much space the artifact takes on the classpath:
+
+- The **dark bar** is the size of the artifact itself (its JAR, or for a git or local dependency, its classpath directories)
+- The **light bar** is the artifact's *footprint*: its own size plus that of every dependency it pulls in, transitively, each counted once
+
+All bars share one scale, the largest footprint in the project (normally the project itself), so they can be compared from artifact to artifact and as you navigate. Hover over a bar for the exact sizes.
+The properties panel shows the same sizes, with the same bar; the "with dependencies" size is omitted for an artifact that has no visible dependencies, since it would just repeat the artifact's own size.
+
+For the project itself (the root), the size is the total size of the project's own directories on the classpath
+(for example, its source and resource paths), and the footprint is the size of the entire classpath.
+Footprints count only the artifacts that are currently displayed. Hidden libraries, and anything reachable only through them, are left out.
+In particular, `org.clojure/clojure` is hidden by default, so by default footprints don't include the size of Clojure itself.
+Turn on **View Hidden** in the settings menu and the footprints (and the scale of every bar) grow to include Clojure and any other hidden libraries.
+Hiding or showing an individual library with the Hide/Show button changes footprints the same way.
+
+Sizes for Leiningen and Maven projects come from the JARs in the local Maven repository (`~/.m2`).
 
 ### Dependency Status Popups
 

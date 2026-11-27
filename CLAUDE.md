@@ -19,6 +19,7 @@ Interactive browser-based tool for exploring JVM dependency graphs. Resolves dep
 | Namespace | Role |
 |---|---|
 | `dex.deps` | Core data model — `build-db` indexes artifacts with labels, dependants, and label search index |
+| `dex.size` | Measures classpath entries (`path-size`, `paths-size`) and formats sizes |
 | `dex.deps-reader` | Reads `deps.edn` via `tools.deps`, walks trace tree to produce flat artifact map; `read-bb-deps` reads Babashka `bb.edn` the same way (no aliases) |
 | `dex.lein-reader` | Reads `project.clj` via leiningen-core APIs, resolves per-artifact deps via Aether |
 | `dex.maven-reader` | Reads `pom.xml` by running `mvn dependency:tree` as a subprocess and parsing the text tree output |
@@ -31,15 +32,17 @@ Interactive browser-based tool for exploring JVM dependency graphs. Resolves dep
 
 **Artifact map** (input to `deps/build-db`):
 ```clojure
-{artifact-key -> {:version string, :label string?, :deps {artifact-key -> {:version string}}}}
+{artifact-key -> {:version string, :label string?, :size bytes?, :deps {artifact-key -> {:version string}}}}
 ```
-Special key `'ROOT` represents the project itself.
+Special key `'ROOT` represents the project itself. `:size` is the artifact's size on disk in bytes (readers add it when known): from the tools.deps basis classpath for `deps.edn`/`bb.edn`, from the JAR in `~/.m2` for Leiningen and Maven. For `ROOT` it is the total size of the project's own classpath directories.
 
 **Database** (output of `deps/build-db`):
 ```clojure
 {:artifacts  {key -> {:version :label :deps ...}}  ; :label guaranteed on all
  :dependants {key -> [{:from key :requested-version v}]}
- :by-label   {lowercase-label -> key}}             ; search index
+ :by-label   {lowercase-label -> key}              ; search index
+ :footprints {key -> bytes}                         ; own size + all transitive deps, each once; {} if no sizes
+ :max-footprint bytes}                              ; scale for size bars
 ```
 
 **View cursor** (Hyper tab-cursor `:view`) — supports multiple UI tabs, each with independent navigation:
@@ -78,6 +81,7 @@ h-screen flex-col
 
 ## Conventions
 
+- **Size bars:** `render-size-bar` in `dex.views` draws a two-tone bar (dark = own `:size`, light = footprint) at the bottom of each box and in the properties panel, scaled against `:max-footprint`. Footprints are computed by `build-db` from the *filtered* data (via `deps/filter-db`), so hidden libs (including `org.clojure/clojure`, hidden by default) and anything reachable only through them are excluded; View Hidden or the per-artifact Hide/Show rebuilds the db and the footprints change accordingly. `:max-footprint` (the bar scale) changes with them. Boxes carry `:size`, `:footprint` and `:max-footprint` from `layout/artifact-box`. The bar is omitted when the data has no sizes (e.g. cached EDN).
 - **Data flow:** The db value is passed to `service/start!` as `:db`, seeded into Hyper's app-state atom, and extracted in views via `(:db @(:hyper/app-state req))`. Views receive db as a parameter — they never access a global atom.
 - **Tabs:** Multiple UI tabs allow independent views into the dependency tree. The ROOT tab (id 0) can't be closed. `open-tab!` creates a new tab rooted at an artifact; `close-tab!` removes one and selects the most recently viewed; `select-tab!` switches between tabs. Artifact boxes show a ⊕ icon to open a new tab unless the artifact already has one. `tab-root-set` returns the set of artifact keys that have tabs.
 - **Navigation:** All artifact selection changes (box clicks, search, home) go through `navigate!` which pushes current state onto the active tab's `:nav-history` before switching. `navigate-back!` pops the stack and restores `{:selected :left-offset :right-offset}`. The home button navigates to the root artifact of the current tab (via `active-tab-root`), not necessarily `'ROOT`.

@@ -126,6 +126,10 @@
      :name (:label info)
      :version (:version info)
      :leaf? (empty? (:deps info))
+     ;; Sizes in bytes (nil when unknown), for the footprint bar
+     :size (:size info)
+     :footprint (deps/footprint db artifact-key)
+     :max-footprint (:max-footprint db)
      :column column
      :row row}))
 

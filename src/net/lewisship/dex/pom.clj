@@ -35,6 +35,14 @@
     (io/file (.getParentFile pom)
              (string/replace n #"\.pom$" ".jar"))))
 
+(defn jar-size
+  "Returns the size in bytes of the JAR for the given Maven-style artifact key
+  and version in the local repository (~/.m2/repository), or nil if it isn't there."
+  [artifact-key version]
+  (let [jar (jar-file (pom-file artifact-key version))]
+    (when (.isFile jar)
+      (.length jar))))
+
 (defn- child-text
   "Returns the text content of the first child element with the given tag,
   or nil if not found."

@@ -23,7 +23,9 @@
             [babashka.process :as process]
             [clj-commons.ansi :refer [perr]]
             [clojure.string :as string]
-            [net.lewisship.cli-tools :refer [abort]]))
+            [net.lewisship.cli-tools :refer [abort]]
+            [net.lewisship.dex.pom :as pom]
+            [net.lewisship.dex.size :as size]))
 
 (defn- find-maven-executable
   "Finds the Maven executable to use.  Prefers the Maven wrapper
@@ -158,6 +160,18 @@
                           artifacts)]
     (assoc other-artifacts 'ROOT root-entry)))
 
+(defn- add-jar-sizes
+  "Adds :size (bytes) to each artifact (other than ROOT) whose JAR is in the
+  local Maven repository."
+  [data]
+  (reduce-kv (fn [m k {:keys [version] :as info}]
+               (assoc m k (if-let [bytes (and (not= 'ROOT k)
+                                              (pom/jar-size k version))]
+                            (assoc info :size bytes)
+                            info)))
+             {}
+             data))
+
 (defn read-deps
   "Reads a Maven project's dependencies by running `mvn dependency:tree`
   and parsing the text tree output.
@@ -208,5 +222,8 @@
           parsed    (parse-tree tree-text)]
       (when-not parsed
         (abort [:yellow "No dependency data found in Maven output"]))
-      (let [[root-key artifacts children] parsed]
-        (build-artifact-map root-key artifacts children project-label)))))
+      (let [[root-key artifacts children] parsed
+            data      (build-artifact-map root-key artifacts children project-label)
+            root-size (size/paths-size [(fs/file project-dir "src" "main")])]
+        (-> (add-jar-sizes data)
+            (update 'ROOT #(cond-> % root-size (assoc :size root-size))))))))

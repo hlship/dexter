@@ -9,7 +9,8 @@
             [hyper.core :as h]
             [net.lewisship.dex.deps :as deps]
             [net.lewisship.dex.layout :as layout]
-            [net.lewisship.dex.pom :as pom]))
+            [net.lewisship.dex.pom :as pom]
+            [net.lewisship.dex.size :as size]))
 
 ;; Extend Hyper's client-param registry so that $scroll-delta-y can be used
 ;; inside h/action forms to receive the wheel event's deltaY on the server.
@@ -154,14 +155,49 @@
     (fn [current]
       (max 0 (min max-offset (+ current delta))))))
 
+;; --- Size Bars ---
+
+(defn- percent-width
+  "CSS width style for `n` bytes on a scale of `max-bytes`. Non-zero sizes get
+  at least a sliver, so tiny artifacts remain visible."
+  [n max-bytes]
+  (let [pct (if (pos? n)
+              (max 0.5 (* 100.0 (/ (double n) max-bytes)))
+              0.0)]
+    (str "width: " (/ (Math/round (* 10 pct)) 10.0) "%")))
+
+(defn- size-description
+  "Tooltip text describing an artifact's own size and footprint."
+  [size footprint]
+  (str "Size: " (or (size/format-size size) "unknown")
+       " · With dependencies: " (size/format-size footprint)))
+
+(defn- render-size-bar
+  "Renders a two-tone horizontal bar: the light bar is the artifact's footprint
+  (its own size plus all transitive dependencies), the dark bar over it is the
+  artifact's own size. Both use the same scale, the largest footprint in the
+  database, so bars are comparable between artifacts.
+
+  Returns nil when sizes are unknown."
+  [{:keys [size footprint max-footprint]}]
+  (when (and footprint max-footprint (pos? max-footprint))
+    [:div {:class "relative h-1.5 w-full rounded-full bg-slate-100 overflow-hidden"
+           :title (size-description size footprint)}
+     [:div {:class "absolute inset-y-0 left-0 bg-sky-300"
+            :style (percent-width footprint max-footprint)}]
+     [:div {:class "absolute inset-y-0 left-0 bg-sky-600"
+            :style (percent-width (or size 0) max-footprint)}]]))
+
 ;; --- Box Rendering ---
 
 (defn- render-box
   "Renders a single artifact box as a Tailwind-styled div.
   select-action is a Datastar expression string returned by h/action.
   Leaf nodes (no dependencies) are annotated with a grey right border marker.
-  Dependencies with version mismatches get a colored right border."
-  [{:keys [key name version leaf? version-color]} selected? select-action]
+  Dependencies with version mismatches get a colored right border.
+  When sizes are known, a bar at the bottom shows the artifact's size and its
+  footprint (including all dependencies)."
+  [{:keys [key name version leaf? version-color] :as box} selected? select-action]
   [:div {:id (str "box-" key)
          :class (str "w-full rounded-lg border-2 cursor-pointer "
                      "transition-colors duration-150 "
@@ -179,7 +215,9 @@
    [:div {:class (str "pl-4 py-2 "
                       (if (or version-color leaf?) "pr-4" "pr-6"))}
     [:div {:class "font-semibold text-sm text-slate-800 truncate" :title name} name]
-    [:div {:class "text-xs text-slate-500"} version]]])
+    [:div {:class "text-xs text-slate-500"} version]
+    (when-let [bar (render-size-bar box)]
+      [:div {:class "mt-1.5"} bar])]])
 
 (defn- render-overflow-indicator
   "Renders an 'N more above/below' indicator for windowed columns.
@@ -480,12 +518,28 @@
        [:div {:class "text-xs font-medium text-slate-400 uppercase tracking-wide mb-1"}
         "Version"]
        [:div {:class "text-sm text-slate-800 font-mono"} version]]
-      ;; JAR size
-      (when jar-size
+      ;; Size: the artifact's own size and its footprint (with all transitive
+      ;; dependencies). Falls back to the JAR size from the local Maven repo
+      ;; when the dependency data carries no sizes.
+      (if (:footprint selected-box)
         [:div
          [:div {:class "text-xs font-medium text-slate-400 uppercase tracking-wide mb-1"}
-          "JAR Size"]
-         [:div {:class "text-sm text-slate-800"} jar-size]])
+          "Size"]
+         [:div {:class "text-sm text-slate-800"}
+          (or (size/format-size (:size selected-box)) "unknown")
+          [:span {:class "text-xs text-slate-400 ml-1"}
+           (if (= key 'ROOT) "project files" "this artifact")]]
+         ;; With no visible dependencies the footprint is just the size, so omit it
+         (when (seq dependencies)
+           [:div {:class "text-sm text-slate-800"}
+            (size/format-size (:footprint selected-box))
+            [:span {:class "text-xs text-slate-400 ml-1"} "with dependencies"]])
+         [:div {:class "mt-1.5"} (render-size-bar selected-box)]]
+        (when jar-size
+          [:div
+           [:div {:class "text-xs font-medium text-slate-400 uppercase tracking-wide mb-1"}
+            "JAR Size"]
+           [:div {:class "text-sm text-slate-800"} jar-size]]))
       ;; Description from POM
       (when description
         [:div

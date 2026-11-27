@@ -6,10 +6,13 @@
   The output format is a flat map of {artifact-key -> artifact-info}:
   - Each artifact-key is a symbol (e.g., org.clojure/clojure)
   - The special key ROOT represents the project itself
-  - artifact-info has :version (string), optional :label, optional :deps
+  - artifact-info has :version (string), optional :label, optional :size (bytes
+    on disk; for ROOT, the total of the project's own classpath directories),
+    optional :deps
   - :deps is {artifact-key -> {:version requested-version-string}}"
   (:require [babashka.fs :as fs]
             [clojure.tools.deps :as td]
+            [net.lewisship.dex.size :as size]
             [clojure.tools.deps.tree :as tree])
   (:import (java.io File)))
 
@@ -73,6 +76,22 @@
       (seq root-deps) (assoc :deps root-deps))))
 
 
+(defn- classpath-sizes
+  "Measures the classpath of a basis. The basis :classpath maps each path to its
+  source: {:lib-name sym} for a library (a JAR, or a git/local root directory), or
+  {:path-key kw} for one of the project's own directories.
+
+  Returns {:lib-sizes {lib -> bytes}, :root-size bytes-or-nil}, where :root-size
+  totals the project's own directories."
+  [basis]
+  (let [{lib-paths true project-paths false}
+        (group-by (comp boolean :lib-name val) (:classpath basis))]
+    {:lib-sizes (reduce (fn [m [path {:keys [lib-name]}]]
+                          (update m lib-name (fnil + 0) (size/path-size path)))
+                        {}
+                        lib-paths)
+     :root-size (size/paths-size (map key project-paths))}))
+
 (defn read-deps
   "Reads a deps.edn file, resolves its transitive dependencies, and returns
   a raw data map suitable for passing to deps/build-db.
@@ -100,8 +119,15 @@
         ;; Walk tree to collect all artifacts
         artifacts (collect-artifacts top-children lib-map)
         ;; Build ROOT entry from the tree's top-level children (includes alias deps)
-        root-entry (build-root-entry top-children project-label)]
-    (assoc artifacts 'ROOT root-entry)))
+        root-entry (build-root-entry top-children project-label)
+        {:keys [lib-sizes root-size]} (classpath-sizes basis)
+        artifacts' (reduce-kv (fn [m lib size]
+                                (cond-> m
+                                  (contains? m lib) (assoc-in [lib :size] size)))
+                              artifacts
+                              lib-sizes)]
+    (assoc artifacts' 'ROOT (cond-> root-entry
+                              root-size (assoc :size root-size)))))
 
 (defn read-bb-deps
   "Reads a Babashka bb.edn file, which uses the same :paths and :deps format as

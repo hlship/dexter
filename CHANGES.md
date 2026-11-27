@@ -1,5 +1,9 @@
 # 0.1 -- UNRELEASED
 
+- Artifact boxes show a size bar: the artifact's own size and its footprint (itself plus all
+  transitive dependencies); the properties panel shows the same sizes.
+  Footprints count only visible artifacts; showing hidden dependencies (including `org.clojure/clojure`) grows them
+
 - Added support for Babashka `bb.edn` files
 
 - Bumped dependencies; adapted to Hyper's new `:datastar-url` option
