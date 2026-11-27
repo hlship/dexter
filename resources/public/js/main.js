@@ -113,7 +113,25 @@ function computeArrowPath(fromRect, toRect, containerRect, conn) {
   return `M${x1},${y1} C${cx},${cy1} ${cx},${cy2} ${x2},${y2}`;
 }
 
-// Draws all arrows into the SVG overlay based on connection data and actual box positions.
+// Side columns scroll natively and contain every box, so most boxes may be out
+// of view. A box is visible when its vertical center is inside its scrolling
+// column; boxes outside a .dep-column (the selected box) are always visible.
+function isBoxVisible(boxEl, boxRect, scrollerRects) {
+  const scroller = boxEl.closest(".dep-column");
+  if (!scroller) return true;
+
+  let scrollerRect = scrollerRects.get(scroller);
+  if (!scrollerRect) {
+    scrollerRect = scroller.getBoundingClientRect();
+    scrollerRects.set(scroller, scrollerRect);
+  }
+
+  const middle = boxRect.top + boxRect.height / 2;
+  return middle >= scrollerRect.top && middle <= scrollerRect.bottom;
+}
+
+// Draws arrows into the SVG overlay based on connection data and actual box
+// positions. Arrows are only drawn between boxes that are currently visible.
 function drawArrows(container, connections) {
   const svg = container.querySelector("#arrow-overlay");
   if (!svg) return;
@@ -126,6 +144,7 @@ function drawArrows(container, connections) {
   ensureArrowDefs(svg);
 
   const tooltip = getOrCreateTooltip(container);
+  const scrollerRects = new Map();
 
   for (const conn of connections) {
     const fromEl = document.getElementById(conn.fromId);
@@ -134,6 +153,11 @@ function drawArrows(container, connections) {
 
     const fromRect = fromEl.getBoundingClientRect();
     const toRect = toEl.getBoundingClientRect();
+
+    if (!isBoxVisible(fromEl, fromRect, scrollerRects) ||
+        !isBoxVisible(toEl, toRect, scrollerRects)) {
+      continue;
+    }
 
     const d = computeArrowPath(fromRect, toRect, containerRect, conn);
     const isMismatch = conn.requestedVersion !== conn.resolvedVersion;
@@ -237,7 +261,7 @@ function snapshotBoxPositions() {
   const positions = new Map();
   document.querySelectorAll('[id^="box-"]').forEach((el) => {
     const rect = el.getBoundingClientRect();
-    positions.set(el.id, { top: rect.top, left: rect.left });
+    positions.set(el.id, { top: rect.top, left: rect.left, bottom: rect.bottom });
   });
   return positions;
 }
@@ -265,18 +289,25 @@ function cancelPendingFlip() {
 // Compute FLIP offsets between old and new box positions.
 // Returns a Map of element id → { el, dx, dy } for moved boxes, or
 // { el, isNew: true } for boxes that weren't in the previous snapshot.
-function computeFlipOffsets(oldPositions) {
+//
+// The columns hold every box, so only boxes that are on screen before or after
+// the change (inside `viewRect`, the dep-viewer's rectangle) are animated;
+// animating hundreds of off-screen elements would be wasted work.
+function computeFlipOffsets(oldPositions, viewRect) {
+  const inView = (top, bottom) => bottom >= viewRect.top && top <= viewRect.bottom;
   const offsets = new Map();
   document.querySelectorAll('[id^="box-"]').forEach((el) => {
     const newRect = el.getBoundingClientRect();
+    const newVisible = inView(newRect.top, newRect.bottom);
     const old = oldPositions.get(el.id);
     if (old) {
+      if (!newVisible && !inView(old.top, old.bottom)) return;
       const dx = old.left - newRect.left;
       const dy = old.top - newRect.top;
       if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
         offsets.set(el.id, { el, dx, dy });
       }
-    } else {
+    } else if (newVisible) {
       offsets.set(el.id, { el, isNew: true });
     }
   });
@@ -325,6 +356,69 @@ function animateBoxes(offsets) {
   return anims;
 }
 
+// --- Scrollbar width ---
+// The side columns reserve a gutter for their (thin) scrollbar outside the
+// 280px column, so boxes stay as wide as the selected box. The width is
+// browser- and OS-specific (0 for overlay scrollbars), so measure it once and
+// publish it as --sbw for the columns' CSS.
+function publishScrollbarWidth() {
+  const probe = document.createElement("div");
+  probe.style.cssText =
+    "position:absolute;visibility:hidden;width:100px;height:100px;" +
+    "overflow:scroll;scrollbar-width:thin;scrollbar-gutter:stable";
+  document.body.appendChild(probe);
+  const width = probe.offsetWidth - probe.clientWidth;
+  probe.remove();
+  document.documentElement.style.setProperty("--sbw", `${width}px`);
+}
+
+publishScrollbarWidth();
+
+// --- Column scroll memory ---
+// Each side column has a data-scroll-key naming its tab, selection and side.
+// The scroll position of every key is remembered, so navigating Back restores
+// where you were, while a newly selected artifact starts at the top.
+
+const scrollMemory = new Map();
+
+// Called after each morph, before any positions are measured. When a column's
+// key has changed (a different selection), switches to that key's position.
+function syncColumnScroll(container) {
+  container.querySelectorAll("[data-scroll-key]").forEach((column) => {
+    const key = column.dataset.scrollKey;
+    if (column.__scrollKey === key) return;
+    column.__scrollKey = key;
+    column.scrollTop = scrollMemory.get(key) ?? 0;
+  });
+}
+
+let scrollRedrawPending = false;
+
+// Scroll events don't bubble, so this is registered once, with capture, on the
+// document (see below). It must not be registered from the draw-arrows plugin's
+// apply(): Datastar runs the previous apply's cleanup after the next apply, which
+// would remove an identical listener that had just been re-added.
+// Remembers the position and redraws the arrows, which depend on which boxes are
+// visible, once per frame.
+function onColumnScroll(e) {
+  const column = e.target;
+  if (!column.dataset || !column.dataset.scrollKey) return;
+
+  if (column.__scrollKey) {
+    scrollMemory.set(column.__scrollKey, column.scrollTop);
+  }
+
+  if (!scrollRedrawPending) {
+    scrollRedrawPending = true;
+    requestAnimationFrame(() => {
+      scrollRedrawPending = false;
+      drawArrowsIfIdle();
+    });
+  }
+}
+
+document.addEventListener("scroll", onColumnScroll, { capture: true, passive: true });
+
 // Datastar attribute plugin: data-draw-arrows="<connections-json>"
 // Called by Datastar after each DOM morph. Orchestrates:
 // 1. Arrow fade-out (waits for transitionend)
@@ -349,6 +443,9 @@ attribute({
     arrowContainer = el;
     arrowConnections = connections;
 
+    // Restore (or reset) column scroll positions before measuring anything.
+    syncColumnScroll(el);
+
     const svg = el.querySelector("#arrow-overlay");
 
     if (isFirstRender) {
@@ -371,7 +468,7 @@ attribute({
       // Compute FLIP offsets and apply them as inline styles immediately
       // (before the browser paints) so boxes visually stay at their old
       // positions. This prevents a flash of the final layout.
-      const flipOffsets = computeFlipOffsets(oldPositions);
+      const flipOffsets = computeFlipOffsets(oldPositions, el.getBoundingClientRect());
       applyFlipOffsets(flipOffsets);
 
       // Create an AbortController for this sequence. Its signal is passed
@@ -438,111 +535,6 @@ attribute({
     return () => {
       resizeObserver.disconnect();
     };
-  },
-});
-
-/**
- * Datastar plugin: data-track-height
- *
- * Observes the element's height via ResizeObserver and computes the maximum
- * number of artifact boxes that fit. When the count changes, sets el.value
- * and dispatches a 'change' event so that a data-on:change handler can
- * send the new max-visible to the server.
- *
- * Dynamically measures a .dep-column element (left or right side column)
- * to read the actual rendered box height, gap, and overflow-indicator
- * overhead. Overflow indicators are always present in the DOM (rendered
- * with transparent text when inactive) so the layout is stable.
- *
- * Fallback constants are used only before any columns have been rendered.
- */
-const FALLBACK_BOX_SLOT_HEIGHT = 78; // box (including size bar) + gap fallback
-const FALLBACK_COLUMN_PADDING = 80;  // overhead for two overflow indicators (~24px each + 12px gap)
-
-/**
- * Measures column layout metrics from a rendered .dep-column element.
- *
- * Looks for a side column (which always has two overflow-indicator children
- * plus zero or more box children), measures a box's height, the column gap,
- * and the total space consumed by the indicators.
- *
- * Returns { boxHeight, gap, overhead } or null if no measurable column exists.
- */
-function measureColumnMetrics(container) {
-  // Find a box inside a .dep-column, then navigate to its parent column.
-  // This avoids picking an empty column (e.g. the left column at ROOT
-  // which has no dependants — only two empty overflow indicators).
-  const box = container.querySelector(".dep-column [id^='box-']");
-  if (!box) return null;
-
-  const column = box.closest(".dep-column");
-  if (!column) return null;
-
-  const boxHeight = box.getBoundingClientRect().height;
-  if (boxHeight <= 0) return null;
-
-  const gap = parseFloat(getComputedStyle(column).rowGap) || 0;
-
-  // Measure non-box children (the always-present overflow indicators).
-  // Each indicator's height + one gap between it and the adjacent box.
-  let overhead = 0;
-  for (const child of column.children) {
-    if (!child.id || !child.id.startsWith("box-")) {
-      overhead += child.getBoundingClientRect().height + gap;
-    }
-  }
-
-  return { boxHeight, gap, overhead };
-}
-
-attribute({
-  name: "track-height",
-  keyReq: "denied",
-  valReq: "must",
-  apply: ({ el }) => {
-    let lastMaxVisible = -1;
-
-    function onResize() {
-      // Use the observed container's clientHeight as the available height.
-      // This is always accurate because the ResizeObserver tracks this
-      // element, and its height is set by flex-1 + min-h-0 — a definite
-      // size. We do NOT use the column's clientHeight because Firefox
-      // doesn't always resolve h-full to a definite value inside a
-      // flex-row container whose height comes from flex-1.
-      const height = el.clientHeight;
-      const metrics = measureColumnMetrics(el);
-
-      let mv;
-      if (metrics) {
-        // N boxes with gap between them need:
-        //   N * boxHeight + (N - 1) * gap  =  N * (boxHeight + gap) - gap
-        // Available space for boxes = height - overhead.
-        // Solving: N ≤ (available + gap) / (boxHeight + gap)
-        const available = height - metrics.overhead;
-        const slot = metrics.boxHeight + metrics.gap;
-        mv = Math.max(1, Math.floor((available + metrics.gap) / slot));
-      } else {
-        mv = Math.max(1, Math.floor((height - FALLBACK_COLUMN_PADDING) / FALLBACK_BOX_SLOT_HEIGHT));
-      }
-
-      if (mv !== lastMaxVisible) {
-        lastMaxVisible = mv;
-        el.value = String(mv);
-        el.dispatchEvent(new Event("change", { bubbles: true }));
-      }
-    }
-
-    // Initial computation — double-rAF ensures the morphed DOM has been
-    // fully laid out in all browsers. Firefox sometimes needs the extra
-    // frame before flex children have their final computed sizes.
-    requestAnimationFrame(() => requestAnimationFrame(onResize));
-
-    // ResizeObserver fires after layout, so measurements are already
-    // accurate — no need to defer with requestAnimationFrame.
-    const observer = new ResizeObserver(onResize);
-    observer.observe(el);
-
-    return () => observer.disconnect();
   },
 });
 

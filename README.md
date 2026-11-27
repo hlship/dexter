@@ -17,7 +17,7 @@ Mousing over a dependency arrow expands it and, for non-exact matches, displays 
 - **Keyboard navigation** — `⌘F`/`Ctrl+F` to search, `⌘H`/`Ctrl+H` home, `⌘B`/`Ctrl+B` back, `⌘1`/`⌘2`/`⌘3` to browse compatible/incompatible/unknown dependencies
 - **Animated transitions** — boxes animate smoothly when navigating; arrows fade out and redraw
 - **Dynamic layout** — columns resize automatically to fill the viewport
-- **Windowed columns** — large dependency lists are windowed with scroll indicators so the display stays readable
+- **Scrolling columns** — long lists of dependants or dependencies scroll natively (mouse wheel, trackpad, touch, or scrollbar); a count label shows how many there are, and arrows are drawn for the artifacts currently in view
 
 ## Supported Build Tools
 

@@ -5,18 +5,11 @@
   connection data for the client-side arrow overlay."
   (:require [cheshire.core :as json]
             [clojure.string :as string]
-            [hyper.client-params :as cp]
             [hyper.core :as h]
             [net.lewisship.dex.deps :as deps]
             [net.lewisship.dex.layout :as layout]
             [net.lewisship.dex.pom :as pom]
             [net.lewisship.dex.size :as size]))
-
-;; Extend Hyper's client-param registry so that $scroll-delta-y can be used
-;; inside h/action forms to receive the wheel event's deltaY on the server.
-;; This must execute before any h/action macro that references the symbol.
-(defmethod cp/client-param '$scroll-delta-y [_]
-  {:js "evt.deltaY" :key "scrollDeltaY"})
 
 ;; --- Tab & View State Helpers ---
 
@@ -87,19 +80,16 @@
                (if-let [[entry trimmed] (last-visible-in-history nav-history db)]
                  (assoc view'
                         :selected (:selected entry)
-                        :left-offset (:left-offset entry)
-                        :right-offset (:right-offset entry)
                         :nav-history trimmed)
                  (assoc view'
                         :selected 'ROOT
-                        :left-offset 0
-                        :right-offset 0
                         :nav-history [])))))))
 
 (defn- navigate!
-  "Pushes the current view state onto :nav-history, then navigates to the
-  given artifact key with offsets reset to 0. No-op if already viewing
-  the target artifact. Operates on the active tab's view."
+  "Pushes the current selection onto :nav-history, then navigates to the
+  given artifact key. No-op if already viewing the target artifact. Operates
+  on the active tab's view. (Column scroll positions live in the browser, which
+  remembers them per selection.)"
   [cursor artifact-key]
   (let [view (active-view @cursor)]
     (when (not= (:selected view) artifact-key)
@@ -107,15 +97,11 @@
              (fn [view]
                (-> view
                    (update :nav-history (fnil conj [])
-                           {:selected (:selected view)
-                            :left-offset (:left-offset view)
-                            :right-offset (:right-offset view)})
-                   (assoc :selected artifact-key
-                          :left-offset 0
-                          :right-offset 0)))))))
+                           {:selected (:selected view)})
+                   (assoc :selected artifact-key)))))))
 
 (defn- navigate-back!
-  "Pops the most recent entry from :nav-history and restores its state.
+  "Pops the most recent entry from :nav-history and restores its selection.
   No-op if history is empty. Operates on the active tab's view."
   [cursor]
   (let [view (active-view @cursor)]
@@ -124,9 +110,7 @@
              (fn [view]
                (let [prev (peek (:nav-history view))]
                  (-> view
-                     (assoc :selected (:selected prev)
-                            :left-offset (:left-offset prev)
-                            :right-offset (:right-offset prev))
+                     (assoc :selected (:selected prev))
                      (update :nav-history pop))))))))
 
 ;; --- Tab Management ---
@@ -141,8 +125,6 @@
              (-> state
                  (update :tabs conj {:id id :root artifact-key :label label})
                  (assoc-in [:views id] {:selected artifact-key
-                                        :left-offset 0
-                                        :right-offset 0
                                         :nav-history []
                                         :hidden-libs (:hidden-libs (active-view state))
                                         :show-hidden? (:show-hidden? (active-view state))})
@@ -173,25 +155,6 @@
                (assoc :active-tab tab-id)
                (update :tab-history
                        (fn [h] (conj (into [] (remove #{tab-id}) h) tab-id)))))))
-
-;; --- Column Scrolling ---
-
-(defn- scroll-offset
-  "Returns a function that adjusts a column offset by `delta` (+1 or -1),
-  clamping to [0, total - max-visible].  `column-key` is the layout key
-  (:left or :right) used to look up the windowed column data."
-  [cursor column-key delta]
-  (let [state @cursor
-        view (active-view state)
-        {:keys [selected left-offset right-offset db]} view
-        {:keys [max-visible]} state
-        layout-data (layout/compute-layout db selected left-offset right-offset
-                                           max-visible)
-        {:keys [total]} (get layout-data column-key)
-        max-visible (or max-visible layout/default-max-visible)
-        max-offset (max 0 (- total max-visible))]
-    (fn [current]
-      (max 0 (min max-offset (+ current delta))))))
 
 ;; --- Size Bars ---
 
@@ -257,51 +220,65 @@
     (when-let [bar (render-size-bar box)]
       [:div {:class "mt-1.5"} bar])]])
 
-(defn- render-overflow-indicator
-  "Renders an 'N more above/below' indicator for windowed columns.
-  Always present in the layout (to reserve stable vertical space), but
-  text is transparent and clicks are disabled when there are no overflow items."
-  [n direction scroll-action]
-  (let [active? (pos? n)]
-    [:div {:class (str "text-center text-xs py-1 "
-                       (if active?
-                         "text-slate-400 cursor-pointer hover:text-blue-500 transition-colors"
-                         "text-transparent select-none"))
-           :data-on:click (when active? scroll-action)}
-     ;; Always render text content so the element keeps its intrinsic height.
-     ;; Unicode arrows + "N more" when active; a non-breaking space placeholder when not.
-     (if active?
-       (str (case direction :up "▲ " :down "▼ ") n " more")
-       "\u00a0")]))
+(def ^:private long-list-threshold
+  "Columns with more boxes than this get a count label, since they may scroll."
+  8)
+
+(def ^:private scrollbar-clearance
+  "Pixels between a side column's boxes and its scrollbar. Arrows between boxes
+  in the same column bow outward up to about 30px from the box edge, so the
+  scrollbar is kept clear of them."
+  36)
 
 (defn- render-column
-  "Renders a column of artifact boxes with optional overflow indicators.
-  The column fills its parent's height and vertically centers its boxes."
-  [{:keys [boxes before after]} column selected-key cursor]
-  (let [offset-key (case column :left :left-offset :right :right-offset)]
-    [:div {:class "dep-column relative flex flex-col justify-center gap-3 w-[280px] h-full"
-           :data-on:wheel__prevent__throttle.150ms
-           (h/action
-            (let [delta (if (pos? $scroll-delta-y) 1 -1)]
-              (swap! cursor update-active-view
-                     (fn [view]
-                       (update view offset-key
-                               (scroll-offset cursor column delta))))))}
-     (render-overflow-indicator
-      before :up
-      (h/action (swap! cursor update-active-view
-                       (fn [view]
-                         (update view offset-key
-                                 (scroll-offset cursor column -1))))))
-     (for [box boxes]
-       (render-box box (= (:key box) selected-key)
-                   (h/action (navigate! cursor (:key box)))))
-     (render-overflow-indicator
-      after :down
-      (h/action (swap! cursor update-active-view
-                       (fn [view]
-                         (update view offset-key
-                                 (scroll-offset cursor column 1))))))]))
+  "Renders a side column of artifact boxes. Every box is rendered and the column
+  scrolls natively (wheel, trackpad, touch and scrollbar), so long lists of
+  dependants or dependencies need no paging.
+
+  The left column's scrollbar is on its outer (left) edge, using `direction: rtl`
+  on the scroller and `ltr` on the content, so it never sits between the boxes
+  and the arrows, which attach to the inner edges. The scrollbar's gutter, plus
+  `scrollbar-clearance` (room for arrows that bow outward from boxes in the same
+  column), lies outside the column's 280px, so boxes stay the same width as the
+  selected box.
+
+  The scroller carries `data-scroll-key`, which identifies the tab, selection and
+  side. The client remembers each key's scroll position, so navigating Back
+  restores it while a new selection starts at the top.
+
+  Short columns stay vertically centered (aligned with the selected box); the
+  content's `min-h-full` + `justify-center` never clips the top when it overflows."
+  [{:keys [boxes total]} column selected-key cursor]
+  (let [left? (= column :left)
+        long? (> total long-list-threshold)
+        scroll-key (str (:active-tab @cursor) "|" selected-key "|" (name column))]
+    [:div {:class "relative w-[280px] shrink-0 h-full min-h-0"}
+     ;; Count label overlaid at the top, fading out the boxes scrolling beneath it
+     (when long?
+       [:div {:class "absolute inset-x-0 top-0 z-10 h-7 pt-1 text-center text-xs text-slate-400 pointer-events-none"
+              :style "background: linear-gradient(to bottom, #f1f5f9 60%, rgba(241, 245, 249, 0))"}
+        (str total (if left? " dependants" " dependencies"))])
+     [:div {:id (str "column-" (name column))
+            :class (str "dep-column h-full overflow-y-auto overscroll-contain "
+                        "[scrollbar-width:thin] [scrollbar-gutter:stable]"
+                        (when left? " [direction:rtl]"))
+            ;; --sbw is the scrollbar width, measured by main.js (0 for overlay
+            ;; scrollbars). The scroller extends outward by that much plus the
+            ;; clearance, so the scrollbar sits outside the column, beyond any
+            ;; arrows, and the boxes keep their position and width.
+            :style (str "width: calc(100% + var(--sbw, 0px) + " scrollbar-clearance "px);"
+                        (when left?
+                          (str " margin-left: calc(-1 * (var(--sbw, 0px) + " scrollbar-clearance "px));")))
+            :data-scroll-key scroll-key}
+      [:div {:class (str "min-h-full flex flex-col justify-center gap-3 py-3"
+                         (when left? " [direction:ltr]")
+                         (when long? " pt-8"))
+             ;; The clearance, on the side facing the scrollbar
+             :style (str (if left? "padding-left: " "padding-right: ")
+                         scrollbar-clearance "px")}
+       (for [box boxes]
+         (render-box box (= (:key box) selected-key)
+                     (h/action (navigate! cursor (:key box)))))]]]))
 
 ;; --- Connection Data ---
 
@@ -838,28 +815,18 @@
                                    :next-id 1
                                    :tab-history [0]
                                    :views {0 {:selected 'ROOT
-                                              :left-offset 0
-                                              :right-offset 0
                                               :nav-history []
                                               :hidden-libs layout/default-hidden-libs
                                               :show-hidden? false}}
-                                   :max-visible nil
                                    :footer-popup nil})
         state @view-cursor
         view (active-view state)
-        {:keys [selected left-offset right-offset hidden-libs show-hidden?]} view
+        {:keys [selected hidden-libs show-hidden?]} view
         ;; Derived (memoized), not stored in the cursor: render must stay pure.
         active-db (visible-db dependency-data hidden-libs show-hidden?)
-        {:keys [max-visible]} state
         tab-roots (tab-root-set state)
-        ;; Defer layout computation until the client has reported viewport
-        ;; dimensions (max-visible). The dep-viewer container must always
-        ;; render so data-track-height can measure it and fire the change
-        ;; event that seeds max-visible. The JS fallback constants are
-        ;; conservative so the first visible render is correct.
-        layout-data (when max-visible
-                      (layout/compute-layout active-db selected left-offset right-offset
-                                             max-visible))]
+        ;; Every box is laid out; the side columns scroll natively in the browser.
+        layout-data (layout/compute-layout active-db selected)]
     ;; Full-viewport flex column: toolbar on top, content fills the rest
     [:div {:class "h-screen flex flex-col bg-slate-100"}
      ;; Toolbar with nav buttons, tabs, and search
@@ -870,43 +837,41 @@
 
       ;; Dependency graph — fills available width next to properties panel.
       ;; data-draw-arrows passes connection JSON to the client-side arrow plugin.
-      [:div (cond-> {:id "dep-viewer"
-                     :class "flex-1 min-w-0 relative flex justify-center gap-[120px] overflow-auto"
-                     :data-track-height "true"
-                     :data-class "{'fade-exact': $fadeExactConnections}"
-                     :data-on:change__debounce.300ms
-                     (h/action
-                      (when-let [mv (some-> $value not-empty parse-long)]
-                        (when (and (pos? mv) (not= mv (:max-visible @view-cursor)))
-                          (swap! view-cursor assoc :max-visible mv))))}
-              layout-data
-              (assoc :data-draw-arrows (connections->json (:connections layout-data)
-                                                          (:id (:selected-box layout-data)))))
+      ;; The padding leaves room, outside the columns, for their scrollbars (see
+      ;; render-column). Columns keep their 280px; the spacers between them are
+      ;; what shrinks (from 120px to 40px) when the window is narrow.
+      [:div {:id "dep-viewer"
+             :class "flex-1 min-w-0 relative flex justify-center overflow-auto"
+             :style (str "padding-left: calc(var(--sbw, 0px) + " scrollbar-clearance "px);"
+                         " padding-right: calc(var(--sbw, 0px) + " scrollbar-clearance "px)")
+             :data-class "{'fade-exact': $fadeExactConnections}"
+             :data-draw-arrows (connections->json (:connections layout-data)
+                                                  (:id (:selected-box layout-data)))}
+       ;; Empty SVG container — client-side JS populates arrow paths
+       [:svg {:id "arrow-overlay"
+              :class "absolute inset-0 pointer-events-none"
+              :width "100%"
+              :height "100%"
+              :xmlns "http://www.w3.org/2000/svg"
+              :data-ignore-morph true}]
 
-       (when layout-data
-         (list
-          ;; Empty SVG container — client-side JS populates arrow paths
-          [:svg {:id "arrow-overlay"
-                 :class "absolute inset-0 pointer-events-none"
-                 :width "100%"
-                 :height "100%"
-                 :xmlns "http://www.w3.org/2000/svg"
-                 :data-ignore-morph true}]
+       ;; Left column: dependants
+       (render-column (:left layout-data) :left selected view-cursor)
 
-          ;; Left column: dependants
-          (render-column (:left layout-data) :left selected view-cursor)
+       [:div {:class "shrink basis-[120px] min-w-[40px]"}]
 
-          ;; Center: selected artifact
-          [:div {:class "relative flex flex-col justify-center w-[280px] h-full"}
-           (render-box (:selected-box layout-data) true (h/action))]
+       ;; Center: selected artifact
+       [:div {:class "relative flex flex-col justify-center w-[280px] shrink-0 h-full"}
+        (render-box (:selected-box layout-data) true (h/action))]
 
-          ;; Right column: dependencies
-          (render-column (:right layout-data) :right selected view-cursor)))]
+       [:div {:class "shrink basis-[120px] min-w-[40px]"}]
+
+       ;; Right column: dependencies
+       (render-column (:right layout-data) :right selected view-cursor)]
 
       ;; Properties panel — fixed-width sidebar on the right
-      (when layout-data
-        (render-properties-panel view-cursor active-db (:selected-box layout-data) tab-roots hidden-libs
-                                 dependency-data))]
+      (render-properties-panel view-cursor active-db (:selected-box layout-data) tab-roots hidden-libs
+                               dependency-data)]
 
      ;; Footer with summary statistics and optional category popup
      (render-footer view-cursor active-db)
