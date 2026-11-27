@@ -19,6 +19,7 @@ Interactive browser-based tool for exploring JVM dependency graphs. Resolves dep
 | Namespace | Role |
 |---|---|
 | `dex.deps` | Core data model — `build-db` indexes artifacts with labels, dependants, and label search index |
+| `dex.size` | Measures classpath entries (`path-size`, `paths-size`) and formats sizes |
 | `dex.deps-reader` | Reads `deps.edn` via `tools.deps`, walks trace tree to produce flat artifact map; `read-bb-deps` reads Babashka `bb.edn` the same way (no aliases) |
 | `dex.lein-reader` | Reads `project.clj` via leiningen-core APIs, resolves per-artifact deps via Aether |
 | `dex.maven-reader` | Reads `pom.xml` by running `mvn dependency:tree` as a subprocess and parsing the text tree output |
@@ -31,15 +32,17 @@ Interactive browser-based tool for exploring JVM dependency graphs. Resolves dep
 
 **Artifact map** (input to `deps/build-db`):
 ```clojure
-{artifact-key -> {:version string, :label string?, :deps {artifact-key -> {:version string}}}}
+{artifact-key -> {:version string, :label string?, :size bytes?, :deps {artifact-key -> {:version string}}}}
 ```
-Special key `'ROOT` represents the project itself.
+Special key `'ROOT` represents the project itself. `:size` is the artifact's size on disk in bytes (readers add it when known): from the tools.deps basis classpath for `deps.edn`/`bb.edn`, from the JAR in `~/.m2` for Leiningen and Maven. For `ROOT` it is the total size of the project's own classpath directories.
 
 **Database** (output of `deps/build-db`):
 ```clojure
 {:artifacts  {key -> {:version :label :deps ...}}  ; :label guaranteed on all
  :dependants {key -> [{:from key :requested-version v}]}
- :by-label   {lowercase-label -> key}}             ; search index
+ :by-label   {lowercase-label -> key}              ; search index
+ :footprints {key -> bytes}                         ; own size + all transitive deps, each once; {} if no sizes
+ :max-footprint bytes}                              ; scale for size bars
 ```
 
 **View cursor** (Hyper tab-cursor `:view`) — supports multiple UI tabs, each with independent navigation:
@@ -78,7 +81,9 @@ h-screen flex-col
 
 ## Conventions
 
-- **Data flow:** The db value is passed to `service/start!` as `:db`, seeded into Hyper's app-state atom, and extracted in views via `(:db @(:hyper/app-state req))`. Views receive db as a parameter — they never access a global atom.
+- **Size bars:** `render-size-bar` in `dex.views` draws a two-tone bar (dark = own `:size`, light = footprint) at the bottom of each box and in the properties panel, scaled against `:max-footprint`. Footprints are computed by `build-db` from the *filtered* data (via `deps/filter-db`), so hidden libs (including `org.clojure/clojure`, hidden by default) and anything reachable only through them are excluded; View Hidden or the per-artifact Hide/Show rebuilds the db and the footprints change accordingly. `:max-footprint` (the bar scale) changes with them. Boxes carry `:size`, `:footprint` and `:max-footprint` from `layout/artifact-box`. The bar is omitted when the data has no sizes (e.g. cached EDN).
+- **Data flow:** The raw dependency data (from a reader) is passed to `service/start!` as `:dependency-data`, seeded into Hyper's app-state atom, and extracted in `home-page` via `(:dependency-data @(:hyper/app-state req))`. The per-tab db is *derived* during render by the memoized `visible-db` from the tab's `:hidden-libs` and `:show-hidden?`; it is not stored in the view cursor. Views receive db as a parameter — they never access a global atom.
+- **Render purity:** Hyper's render guard warns (`:hyper.warn/effect-in-render`) on cursor `swap!`/`reset!` during render, so `home-page` and the `render-*` functions must not write state. Effects belong in `h/action` bodies. `update-visibility!` (used by the View Hidden toggle and Hide/Show button) changes visibility and falls back to the most recent visible artifact in one action.
 - **Tabs:** Multiple UI tabs allow independent views into the dependency tree. The ROOT tab (id 0) can't be closed. `open-tab!` creates a new tab rooted at an artifact; `close-tab!` removes one and selects the most recently viewed; `select-tab!` switches between tabs. Artifact boxes show a ⊕ icon to open a new tab unless the artifact already has one. `tab-root-set` returns the set of artifact keys that have tabs.
 - **Navigation:** All artifact selection changes (box clicks, search, home) go through `navigate!` which pushes current state onto the active tab's `:nav-history` before switching. `navigate-back!` pops the stack and restores `{:selected :left-offset :right-offset}`. The home button navigates to the root artifact of the current tab (via `active-tab-root`), not necessarily `'ROOT`.
 - **Column scrolling:** Mouse wheel scrolling on columns uses Datastar's built-in `data-on:wheel` with `$scroll-delta-y` (a custom Hyper client param) and `scroll-offset` for bounds-clamped offset updates.
@@ -93,7 +98,7 @@ h-screen flex-col
 - **Footer category popups:** The footer's colored indicators (compatible/incompatible/unknown) are clickable. Clicking one sets `:footer-popup` in the view cursor, which triggers a server-rendered DaisyUI modal listing all artifacts in that category (via `layout/artifacts-by-match`). The popup includes a search/filter field (when >8 items), scrollable list, and closes on backdrop click, ✕ button, or Escape key. Clicking an artifact navigates to it and closes the popup. Both `summary-stats` and `artifacts-by-match` accept `hidden-libs` and count unique artifacts (not dependency edges) so footer numbers match popup counts.
 - **Properties panel:** Always visible as a fixed-width sidebar (320px) on the right side of the content area. The dep-viewer and properties panel sit side by side in a flex container — the dep-viewer gets `flex-1 min-w-0` and the panel gets `w-80 shrink-0`. This ensures the graph centers within the available space, not the full viewport.
 - **Unresolved dependencies:** `build-db` filters out dependency edges whose target is not in the raw data (version-evicted transitive dependencies that appear in the trace tree but were never resolved). This prevents phantom artifacts from appearing in counts or navigation.
-- **Server disconnect modal:** A DaisyUI modal (`#disconnect-modal` inside `#modal-container`) is rendered hidden in the page by `home-page`. The container has `data-ignore-morph` so Datastar's DOM morph won't revert JS changes. Client-side JS listens for `datastar-fetch` custom events; on `"retrying"` or `"retries-failed"` it adds `modal-open` to show "You may close this window now."
+- **Server disconnect modal:** A DaisyUI modal (`#disconnect-modal` inside `#modal-container`) is rendered hidden in the page by `home-page`. The container has `data-ignore-morph` so Datastar's DOM morph won't revert JS changes. Client-side JS listens for `datastar-fetch` custom events; on `"retrying"` or `"retries-failed"` it adds `modal-open` to show "You may close this window now." When the server exits cleanly, Hyper's event stream just ends and Datastar reports only `"finished"` for `<body>` (no retry), so `"finished"` on `<body>` triggers a probe (`HEAD /favicon.svg`, repeated a few times because the stream closes slightly before the listening socket); if the server is unreachable, the modal is shown. A healthy server answers the probe, so benign stream restarts show nothing.
 - **Modal suppression:** The `data-accel` plugin checks `.modal.modal-open` to suppress keyboard shortcuts when any modal is visible (both server-rendered popups and client-side modals).
 
 ## Running
@@ -113,7 +118,7 @@ bb tailwind
 bb test
 ```
 
-**REPL workflow:** Load dependency data into the local `*db` atom in `demo.clj`, then call `(service/start! {:db @*db})`. The db value is seeded into Hyper's app-state and flows to views via the request — views never access a global atom directly.
+**REPL workflow:** Load dependency data into the local `*dependency-data` atom in `demo.clj`, then call `(service/start! {:dependency-data @*dependency-data})`. The dependency data is seeded into Hyper's app-state and flows to views via the request — views never access a global atom directly.
 
 ## Keyboard Shortcuts
 

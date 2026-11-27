@@ -72,3 +72,40 @@
 
   (testing "no match returns nil"
     (is (nil? (deps/find-artifact db "nonexistent")))))
+
+(def ^:private sized-data
+  {'ROOT {:version "1" :size 5
+          :deps    {'a/a {:version "1"} 'b/b {:version "1"}}}
+   'a/a  {:version "1" :size 10
+          :deps    {'c/c {:version "1"} 'gone/gone {:version "1"}}}
+   'b/b  {:version "1" :size 20
+          :deps    {'c/c {:version "1"}}}
+   'c/c  {:version "1" :size 100
+          :deps    {'a/a {:version "1"}}}}) ; cycle back to a/a
+
+(deftest footprints-count-each-artifact-once
+  (let [fp (deps/footprints sized-data)]
+    (is (= 135 (get fp 'ROOT)) "ROOT counts c/c once, though reachable two ways")
+    (is (= 110 (get fp 'a/a)) "cycles terminate; a + c")
+    (is (= 130 (get fp 'b/b)) "b + c + a, via c's cycle")
+    (is (= 110 (get fp 'c/c)))))
+
+(deftest footprints-empty-without-sizes
+  (is (= {} (deps/footprints {'ROOT {:version "1"} 'a/a {:version "1"}}))))
+
+(deftest db-has-footprints-and-scale
+  (let [db (deps/build-db sized-data)]
+    (is (= 130 (deps/footprint db 'b/b)))
+    (is (= 135 (:max-footprint db)))))
+
+(deftest filter-db-footprints-cover-visible-artifacts-only
+  (let [hidden (deps/filter-db sized-data #{'c/c})
+        shown  (deps/filter-db sized-data #{})]
+    (is (nil? (deps/artifact-info hidden 'c/c)) "hidden artifact is not displayed")
+    (is (= 35 (deps/footprint hidden 'ROOT)) "5 + 10 + 20; hidden c/c doesn't count")
+    (is (= 10 (deps/footprint hidden 'a/a)))
+    (is (= 35 (:max-footprint hidden)))
+    (testing "showing hidden artifacts includes them in footprints"
+      (is (= 135 (deps/footprint shown 'ROOT)))
+      (is (= 110 (deps/footprint shown 'a/a)))
+      (is (= 135 (:max-footprint shown))))))
