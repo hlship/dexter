@@ -4,7 +4,7 @@
 
 - **Never commit without explicit approval.** After making changes, describe what was done and let the user verify before committing. Only commit when the user says "commit".
 
-Interactive browser-based tool for exploring JVM dependency graphs. Resolves dependencies from `deps.edn` (via tools.deps) or `project.clj` (via leiningen-core APIs), then renders a three-column graph with navigable artifact boxes and SVG connection arrows.
+Interactive browser-based tool for exploring JVM dependency graphs. Resolves dependencies from `deps.edn` or `bb.edn` (via tools.deps), `pom.xml` (via Maven), or `project.clj` (via leiningen-core APIs), then renders a three-column graph with navigable artifact boxes and SVG connection arrows.
 
 ## Architecture
 
@@ -19,7 +19,7 @@ Interactive browser-based tool for exploring JVM dependency graphs. Resolves dep
 | Namespace | Role |
 |---|---|
 | `dex.deps` | Core data model — `build-db` indexes artifacts with labels, dependants, and label search index |
-| `dex.deps-reader` | Reads `deps.edn` via `tools.deps`, walks trace tree to produce flat artifact map |
+| `dex.deps-reader` | Reads `deps.edn` via `tools.deps`, walks trace tree to produce flat artifact map; `read-bb-deps` reads Babashka `bb.edn` the same way (no aliases) |
 | `dex.lein-reader` | Reads `project.clj` via leiningen-core APIs, resolves per-artifact deps via Aether |
 | `dex.maven-reader` | Reads `pom.xml` by running `mvn dependency:tree` as a subprocess and parsing the text tree output |
 | `dex.layout` | Computes three-column layout: windowed columns, connection graph, version match colors, box annotations |

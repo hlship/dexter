@@ -1,0 +1,4 @@
+{:paths ["scripts"]
+ :deps  {babashka/fs      {:mvn/version "0.5.34"}
+         org.clj-commons/pretty {:mvn/version "3.11.1"}}
+ :tasks {hello (println "hello")}}

@@ -102,3 +102,12 @@
         ;; Build ROOT entry from the tree's top-level children (includes alias deps)
         root-entry (build-root-entry top-children project-label)]
     (assoc artifacts 'ROOT root-entry)))
+
+(defn read-bb-deps
+  "Reads a Babashka bb.edn file, which uses the same :paths and :deps format as
+  deps.edn but never has aliases; any :aliases option is ignored.
+
+  Options:
+  - :label - display label for the ROOT entry (defaults to directory name)"
+  [^File bb-edn-path opts]
+  (read-deps bb-edn-path (dissoc opts :aliases)))

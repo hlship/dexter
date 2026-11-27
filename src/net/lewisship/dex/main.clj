@@ -12,6 +12,7 @@
 
 (def ^:private readers
   [["deps.edn" 'net.lewisship.dex.deps-reader/read-deps]
+   ["bb.edn" 'net.lewisship.dex.deps-reader/read-bb-deps]
    ["project.clj" 'net.lewisship.dex.lein-reader/read-deps]
    ["pom.xml" 'net.lewisship.dex.maven-reader/read-deps]])
 
@@ -38,7 +39,7 @@
   The dependencies, relationships, and versions are analyzed and a browser is launched
   to allow interactive exploration of the dependency hierarchy.
   
-  Normally, will find the correct dependency file (deps.edn, project.clj, etc.) in the
+  Normally, will find the correct dependency file (deps.edn, bb.edn, project.clj, etc.) in the
   current directory, though the --file option can override this."
   [port ["-p" "--port NUMBER" "Port to use for web server"
          :parse-fn parse-long

@@ -85,3 +85,14 @@
           "hyper should have a version string")
       (is (pos? (count (:version hyper-info)))
           "hyper version should not be empty"))))
+
+(deftest read-bb-deps
+  (testing "bb.edn is read like deps.edn; :tasks are ignored and aliases never apply"
+    (let [raw-data (deps-reader/read-bb-deps "test-resources/dex/test-bb.edn" {:aliases ["dev"]})
+          db       (deps/build-db raw-data)
+          root     (deps/artifact-info db 'ROOT)]
+      ;; tools.deps also adds org.clojure/clojure from its root deps.edn
+      (is (every? (set (keys (:deps root)))
+                  ['babashka/fs 'org.clj-commons/pretty]))
+      (is (= "0.5.34" (:version (deps/artifact-info db 'babashka/fs))))
+      (is (some? (deps/artifact-info db 'org.clj-commons/pretty))))))
