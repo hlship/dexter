@@ -69,7 +69,8 @@ git log --oneline $(git describe --tags --abbrev=0)..HEAD
 
 Read `CHANGES.md` and ensure the top section has the correct version (the tag being released) and is
 not still marked `UNRELEASED`. If it is still the `# 0.1 -- UNRELEASED` section, change its heading to
-the new tag, e.g. `# 0.1-beta-3`.
+the new tag followed by the release date (day, abbreviated month, year), e.g.
+`# 0.1-beta-3 -- 27 Nov 2026`. Every released version's heading carries its date this way.
 
 Compare the notes against the commits since the last release: every user-visible change should be
 mentioned (bug fixes as well as features). Ask the user to confirm the release notes are complete.

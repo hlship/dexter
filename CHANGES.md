@@ -1,6 +1,6 @@
 # 0.1 -- UNRELEASED
 
-# 0.1-beta-3
+# 0.1-beta-3 -- 27 Nov 2026
 
 - The dependants and dependencies columns now scroll natively instead of one artifact
   per click, so very long lists are practical; the "N more" indicators are gone.
@@ -17,7 +17,7 @@
 - The "You may close this window now" dialog appears as soon as the server stops,
   rather than only after the next click in the browser
 
-# 0.1-beta-2
+# 0.1-beta-2 -- 19 May 2026
 
 - Added floating action button (FAB) settings menu with toggles for fading
   exact connections and viewing hidden libraries
@@ -32,7 +32,7 @@
 
 - Added manual GitHub Actions workflow to smoke test the Windows Scoop install
 
-# 0.1-beta-1
+# 0.1-beta-1 -- 7 May 2026
 
 - Properties panel is now always visible as a fixed-width sidebar
 
