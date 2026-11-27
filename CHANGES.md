@@ -1,5 +1,9 @@
 # 0.1 -- UNRELEASED
 
+- Added support for Babashka `bb.edn` files
+
+- Bumped dependencies; adapted to Hyper's new `:datastar-url` option
+
 # 0.1-beta-2
 
 - Added floating action button (FAB) settings menu with toggles for fading

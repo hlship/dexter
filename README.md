@@ -24,6 +24,7 @@ Mousing over a dependency arrow expands it and, for non-exact matches, displays 
 | Build Tool | Status |
 |---|---|
 | **tools.deps** (`deps.edn`) | ✅ Supported |
+| **Babashka** (`bb.edn`) | ✅ Supported |
 | **Leiningen** (`project.clj`) | ✅ Supported |
 | **Maven** (`pom.xml`) | ✅ Supported |
 | **Gradle** (`build.gradle`) | 🔜 Planned |
@@ -76,6 +77,9 @@ dexter
 
 # Explore a specific project with dev dependencies included
 dexter -f /path/to/project -a dev
+
+# Babashka project (bb.edn has no aliases, so -a is ignored)
+dexter -f /path/to/bb.edn
 
 # Leiningen project with dev and test profiles
 dexter -f /path/to/project.clj -a dev -a test
