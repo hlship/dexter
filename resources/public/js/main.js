@@ -669,11 +669,52 @@ attribute({
 // '.modal.modal-open' to suppress keyboard shortcuts when any modal is
 // visible (both server-rendered popups and client-side modals).
 
+//
+// When the server exits cleanly, Hyper's event stream (the one attached to
+// <body>) simply ends: Datastar reports "finished" for it, and does not retry,
+// so no "retrying" event follows until the user next triggers an action. So
+// the end of the event stream is treated as a hint, confirmed by probing the
+// server: if the probe can't connect, the server is gone. (Hyper may also end
+// the stream for benign reasons and reconnect, so "finished" alone isn't enough.)
+// The stream closes slightly before the server's listening socket does, so the
+// probe is repeated a few times; a healthy server answers every one of them.
+
+function showDisconnectModal() {
+  document.getElementById("disconnect-modal")?.classList.add("modal-open");
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function serverIsGone() {
+  try {
+    await fetch("/favicon.svg", {
+      method: "HEAD",
+      cache: "no-store",
+      signal: AbortSignal.timeout(2000),
+    });
+    return false;
+  } catch (_) {
+    return true; // connection refused, or no answer in time
+  }
+}
+
+async function showModalIfServerGone() {
+  for (const delay of [0, 500, 1500]) {
+    await sleep(delay);
+    if (await serverIsGone()) {
+      showDisconnectModal();
+      return;
+    }
+  }
+}
+
 document.addEventListener("datastar-fetch", (e) => {
-  const { type } = e.detail;
+  const { type, el } = e.detail;
 
   if (type === "retrying" || type === "retries-failed") {
-    document.getElementById("disconnect-modal")?.classList.add("modal-open");
+    showDisconnectModal();
+  } else if (type === "finished" && el === document.body) {
+    showModalIfServerGone();
   }
 });
 
